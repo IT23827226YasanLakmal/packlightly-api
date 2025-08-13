@@ -1,24 +1,22 @@
-const admin = require('../config/firebase');
+import admin from "../config/firebase.js";
 
-async function verifyFirebaseToken(req, res, next) {
-  const h = req.headers.authorization;
-  if (!h || !h.startsWith('Bearer ')) return res.status(401).json({ message: 'No token' });
-  const idToken = h.split(' ')[1];
+const authenticateFirebase = async (req, res, next) => {
   try {
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    req.user = decoded; // uid, email, custom claims, etc.
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Unauthorized: No token provided' });
+    }
+
+    const idToken = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+
+    req.user = decodedToken; // Attach decoded user info to request
     next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Unauthorized' });
+  } catch (error) {
+    console.error('Firebase token verification failed:', error);
+    res.status(401).json({ message: 'Unauthorized: Invalid token' });
   }
-}
+};
 
-function requireRole(role) {
-  return (req, res, next) => {
-    const claims = req.user || {};
-    if (claims.role === role || (claims.admin && role === 'admin')) return next();
-    return res.status(403).json({ message: 'Forbidden' });
-  };
-}
-
-module.exports = { verifyFirebaseToken, requireRole };
+module.exports = authenticateFirebase;

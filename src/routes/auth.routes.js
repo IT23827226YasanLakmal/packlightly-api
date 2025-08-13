@@ -1,7 +1,9 @@
-const router = require('express').Router();
-const { verifyFirebaseToken } = require('../middlewares/auth.middleware');
-const ctrl = require('../controllers/auth.controller');
+const express = require('express');
+const router = express.Router();
+const authenticateFirebase = require('../middlewares/auth.middleware');
+const authController = require('../controllers/auth.controller');
 
-router.get('/profile', verifyFirebaseToken, ctrl.profile);
+// Protected route example
+router.get('/profile', authenticateFirebase, authController.getProfile);
 
 module.exports = router;
