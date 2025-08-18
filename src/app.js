@@ -5,7 +5,7 @@ const cors = require('cors');
 
 const authRoutes = require('./routes/auth.routes');
 const tripRoutes = require('./routes/trip.routes');
-const packingRoutes = require('./routes/packing.routes');
+const packinglistRoutes = require('./routes/packinglist.routes');
 const checklistRoutes = require('./routes/checklist.routes');
 const productRoutes = require('./routes/product.routes');
 const postRoutes = require('./routes/post.routes');
@@ -25,7 +25,7 @@ app.get('/', (req, res) => res.send('PackLightly API'));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/trips', tripRoutes);
-app.use('/api/packing', packingRoutes);
+app.use('/api/packinglists', packinglistRoutes);
 app.use('/api/checklists', checklistRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/posts', postRoutes);

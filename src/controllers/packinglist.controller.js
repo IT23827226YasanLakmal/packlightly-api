@@ -1,4 +1,4 @@
-const svc = require('../services/packing.service');
+const svc = require('../services/packinglist.service');
 
 async function create(req, res, next) {
   try {
