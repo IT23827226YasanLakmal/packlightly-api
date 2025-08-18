@@ -2,8 +2,24 @@ const mongoose = require('mongoose');
 
 const PackingListSchema = new mongoose.Schema({
   tripId: { type: mongoose.Schema.Types.ObjectId, ref: 'Trip' },
-  items: [{ name: String, qty: Number, checked: { type: Boolean, default: false } }],
-  ownerUid: String
+  ownerUid: { type: String, required: true },
+
+  categories: [
+    {
+      name: {
+        type: String,
+        enum: ['Clothing', 'Essentials', 'Toiletries', 'Electronics'], // predefined categories
+        required: true
+      },
+      items: [
+        {
+          name: { type: String, required: true },
+          qty: { type: Number, default: 1 },
+          checked: { type: Boolean, default: false }
+        }
+      ]
+    }
+  ]
 }, { timestamps: true });
 
 module.exports = mongoose.model('PackingList', PackingListSchema);
