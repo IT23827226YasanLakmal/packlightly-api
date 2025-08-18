@@ -5,7 +5,23 @@ const TripSchema = new mongoose.Schema({
   description: String,
   startDate: Date,
   endDate: Date,
-  ownerUid: String
+  durationDays: Number,
+  ownerUid: String,
+  weather: {
+    location: String,
+    tempRange: String,
+    description: String,
+    condition: {
+      type: String,
+      enum: ['sunny', 'cloudy', 'rainy', 'stormy', 'snowy'], // restrict to common types
+      default: 'sunny'
+    },
+    highTemp: String,
+    lowTemp: String,
+    wind: String,
+    humidity: String,
+    chanceRain: String
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Trip', TripSchema);
