@@ -15,6 +15,7 @@ async function seed() {
   // Create a Trip
   const trip = await Trip.create({
     title: "Summer Fun in Bali",
+    destination:"Bali",
     description: "A relaxing summer vacation with beach activities and hiking",
     startDate: new Date("2025-06-10"),
     endDate: new Date("2025-06-20"),
@@ -35,6 +36,7 @@ async function seed() {
 
   // Packing List with categories + items
   await PackingList.create({
+    title: "Bali Packing List",
     tripId: trip._id,
     ownerUid: "aZlm3SLXkYfNGq3CuDmWTbmO3gF3",
     categories: [

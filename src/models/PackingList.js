@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 
 const PackingListSchema = new mongoose.Schema({
+  title:String,
   tripId: { type: mongoose.Schema.Types.ObjectId, ref: 'Trip' },
   ownerUid: { type: String, required: true },
-
+  title: { type: String, required: true },
   categories: [
     {
       name: {
