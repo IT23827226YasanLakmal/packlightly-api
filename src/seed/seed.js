@@ -43,32 +43,32 @@ async function seed() {
       {
         name: "Clothing",
         items: [
-          { name: "T-shirts", qty: 5, checked: false },
-          { name: "Shorts", qty: 3, checked: true },
-          { name: "Hiking Shoes", qty: 1, checked: false }
+          { name: "T-shirts", qty: 5, checked: false , eco:true},
+          { name: "Shorts", qty: 3, checked: true , eco:false},
+          { name: "Hiking Shoes", qty: 1, checked: false , eco:true}
         ]
       },
       {
         name: "Essentials",
         items: [
-          { name: "Passport", qty: 1, checked: true },
-          { name: "Travel Insurance", qty: 1, checked: false }
+          { name: "Passport", qty: 1, checked: true , eco:true},
+          { name: "Travel Insurance", qty: 1, checked: false , eco:false}
         ]
       },
       {
         name: "Toiletries",
         items: [
-          { name: "Sunscreen", qty: 1, checked: false },
-          { name: "Toothbrush", qty: 1, checked: true },
-          { name: "Shampoo", qty: 1, checked: false }
+          { name: "Sunscreen", qty: 1, checked: false , eco:true},
+          { name: "Toothbrush", qty: 1, checked: true , eco:false},
+          { name: "Shampoo", qty: 1, checked: false , eco:true}
         ]
       },
       {
         name: "Electronics",
         items: [
-          { name: "Phone Charger", qty: 1, checked: true },
-          { name: "Camera", qty: 1, checked: false },
-          { name: "Power Bank", qty: 1, checked: false }
+          { name: "Phone Charger", qty: 1, checked: true , eco:false},
+          { name: "Camera", qty: 1, checked: false , eco:true},
+          { name: "Power Bank", qty: 1, checked: false , eco:true}
         ]
       }
     ]

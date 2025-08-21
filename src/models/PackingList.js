@@ -15,7 +15,8 @@ const PackingListSchema = new mongoose.Schema({
         {
           name: { type: String, required: true },
           qty: { type: Number, default: 1 },
-          checked: { type: Boolean, default: false }
+          checked: { type: Boolean, default: false },
+          eco:{type:Boolean, default:false}
         }
       ]
     }
