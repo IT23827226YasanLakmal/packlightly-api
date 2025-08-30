@@ -1,7 +1,6 @@
 const svc = require('../services/packinglist.service');
 
-async function create(req, res, next) {
-  try {
+async function create(req, res, next) {try {
     const payload = { ...req.body, ownerUid: req.user.uid };
     const doc = await svc.create(payload); res.status(201).json(doc);
   } catch (e) { next(e); }
@@ -11,33 +10,70 @@ async function get(req, res, next) { try { res.json(await svc.get(req.params.id)
 async function update(req, res, next) { try { res.json(await svc.update(req.params.id, req.body)); } catch(e){next(e);} }
 async function remove(req, res, next) { try { await svc.remove(req.params.id); res.json({ success: true }); } catch(e){next(e);} }
 
-/** List all checklists */
-async function listChecklists(req, res) {
-  try {
-    const { packingListId } = req.params;
-    const categories = await svc.listChecklists(packingListId);
-    res.json(categories);
-  } catch (error) {
-    res.status(404).json({ message: error.message });
-  }
-};
 
-/** Create new checklist */
-async function createChecklist(req, res) {
+async function updateCategory (req, res) {
   try {
-    const { packingListId } = req.params;
-    const { name, items } = req.body;
-
-    const newChecklist = await svc.createChecklist(
-      packingListId,
-      name,
-      items
+    const { id, category } = req.params;
+    const { items } = req.body;
+    
+    // Validate category
+    const validCategories = ['Clothing', 'Essentials', 'Toiletries', 'Electronics'];
+    if (!validCategories.includes(category)) {
+      return res.status(400).json({ error: 'Invalid category' });
+    }
+    
+    const packingList = await svc.updateCategoryItems(
+      id, 
+      category, 
+      items, 
+      req.user.uid
     );
-
-    res.status(201).json(newChecklist);
+    
+    res.json(packingList);
   } catch (error) {
-    res.status(404).json({ message: error.message });
+    if (error.message === 'Packing list not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message === 'Access denied') {
+      return res.status(403).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message });
   }
 };
 
-module.exports = { create, list, get, update, remove, listChecklists, createChecklist };
+async function generateAIPackingList(req, res) {
+    try {
+      const { tripId } = req.params;
+      const ownerUid = req.user.uid; // Assuming you have user authentication
+
+      const packingList = await svc.generateAIPackingList(tripId, ownerUid);
+      res.json({
+        success: true,
+        data: packingList,
+        message: 'AI packing list generated successfully'
+      });
+    } catch (error) {
+      console.error('Generate AI packing list error:', error);
+      res.status(500).json({ 
+        error: error.message || 'Failed to generate AI packing list' 
+      });
+    }
+  }
+
+async function addAISuggestions(req, res) {
+    try {
+      const { id } = req.params;
+      const ownerUid = req.user.uid;
+
+      const packingList = await svc.addAISuggestions(id, ownerUid);
+      res.json({
+        success: true,
+        data: packingList,
+        message: 'AI suggestions added successfully'
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+module.exports = { create, list, get, update, remove, updateCategory, generateAIPackingList, addAISuggestions };
