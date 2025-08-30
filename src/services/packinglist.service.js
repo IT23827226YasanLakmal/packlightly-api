@@ -75,22 +75,15 @@ async function generateAIPackingList(tripId, ownerUid) {
       }))
     }));
 
-    if (packingList) {
-      // Update existing packing list
-      packingList.categories = categories;
-      packingList.isAIGenerated = true;
-      packingList.lastAIGeneratedAt = new Date();
-      return await packingList.save();
-    } else {
-      // Create new packing list
-      return await PackingList.create({
+    
+    return await PackingList.create({
         tripId,
         ownerUid,
         categories,
         isAIGenerated: true,
         lastAIGeneratedAt: new Date()
       });
-    }
+
   } catch (error) {
     console.error('AI packing list generation error:', error);
     throw new Error('Failed to generate AI packing list: ' + error.message);
