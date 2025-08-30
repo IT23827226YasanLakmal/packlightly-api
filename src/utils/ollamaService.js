@@ -6,7 +6,7 @@ class OllamaService {
   constructor() {
     this.client = axios.create({
       baseURL: OLLAMA_BASE_URL,
-      timeout: 30000,
+      timeout: 180000, // 3 min safety
     });
   }
 
@@ -14,17 +14,21 @@ class OllamaService {
     try {
       const prompt = this.createPackingPrompt(tripData);
 
-      const response = await this.client.post('/api/generate', {
+      const response = await this.client.post('/api/chat', {
         model: 'phi3:mini',
-        prompt: prompt,
         stream: false,
+        messages: [
+          { role: "system", content: "You are a travel packing assistant. You must ONLY output valid JSON, nothing else." },
+          { role: "user", content: prompt }
+        ],
         options: {
           temperature: 0.7,
           top_p: 0.9,
         }
       });
 
-      return this.parsePackingList(response.data.response);
+      // Ollama chat API returns: { message: { role: "assistant", content: "..." } }
+      return this.parsePackingList(response.data.message?.content);
     } catch (error) {
       console.error('Ollama API error:', error.message);
       throw new Error('Failed to generate packing suggestions');
@@ -33,8 +37,8 @@ class OllamaService {
 
   createPackingPrompt(tripData) {
     return `
-As a travel packing expert, suggest a comprehensive packing list for a ${tripData.type.toLowerCase()} trip to ${tripData.destination}. 
-    
+Suggest a comprehensive packing list for a ${tripData.type} trip to ${tripData.destination}.
+
 Trip Details:
 - Destination: ${tripData.destination}
 - Trip Type: ${tripData.type}
@@ -43,7 +47,7 @@ Trip Details:
 - Weather: ${tripData.weather.condition}, ${tripData.weather.tempRange}
 - Dates: ${tripData.startDate} to ${tripData.endDate}
 
-Provide the response as a JSON array of objects with this exact structure:
+Respond STRICTLY as a JSON array of objects, with this exact schema:
 [
   {
     "category": "Clothing",
@@ -69,39 +73,36 @@ Provide the response as a JSON array of objects with this exact structure:
   {
     "category": "Toiletries",
     "items": [
-      { "name": "Toothbrush", "qty": (tripData.passengers.adults + tripData.passengers.children), "checked": false, "eco": true },
+      { "name": "Toothbrush", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": true },
       { "name": "Shampoo", "qty": 1, "checked": false, "eco": true }
     ]
   },
   {
     "category": "Documents",
     "items": [
-      { "name": "Passport", "qty": (tripData.passengers.adults + tripData.passengers.children), "checked": false, "eco": false },
-      { "name": "Tickets", "qty": (tripData.passengers.adults + tripData.passengers.children), "checked": false, "eco": false }
+      { "name": "Passport", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": false },
+      { "name": "Tickets", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": false }
     ]
   },
   {
     "category": "Miscellaneous",
     "items": [
-      { "name": "Reusable Water Bottle", "qty": (tripData.passengers.adults + tripData.passengers.children), "checked": false, "eco": true },
+      { "name": "Reusable Water Bottle", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": true },
       { "name": "Snacks", "qty": ${2 * (tripData.passengers.adults + tripData.passengers.children)}, "checked": false, "eco": false }
     ]
   }
-]
-`;
+]`;
   }
 
   parsePackingList(response) {
     try {
-      // Extract JSON from response
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
       throw new Error('No valid JSON found in response');
     } catch (error) {
-      console.error('Failed to parse packing list:', error);
-      // Return default packing list if parsing fails
+      console.error('Failed to parse packing list:', error, "\nRaw Response:", response);
       return this.getDefaultPackingList();
     }
   }
@@ -130,8 +131,6 @@ Provide the response as a JSON array of objects with this exact structure:
       }
     ];
   }
-
-  
 }
 
 module.exports = new OllamaService();

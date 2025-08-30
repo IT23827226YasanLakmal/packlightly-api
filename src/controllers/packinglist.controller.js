@@ -44,7 +44,7 @@ async function updateCategory (req, res) {
 async function generateAIPackingList(req, res) {
     try {
       const { tripId } = req.params;
-      const ownerUid = req.user.uid; // Assuming you have user authentication
+      const ownerUid = req.user.uid; 
 
       const packingList = await svc.generateAIPackingList(tripId, ownerUid);
       res.json({

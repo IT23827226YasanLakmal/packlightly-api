@@ -26,7 +26,7 @@ const PackingListSchema = new mongoose.Schema({
   lastAIGeneratedAt: { type: Date, default: null }
 }, { timestamps: true });
 
-packingItemSchema.index({ tripId: 1, category: 1 });
+PackingListSchema.index({ tripId: 1, categories: 1 });
 
 
 module.exports = mongoose.model('PackingList', PackingListSchema);

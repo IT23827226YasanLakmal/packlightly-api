@@ -12,26 +12,33 @@ async function seed() {
   await PackingList.deleteMany({});
   await News.deleteMany({});
 
-  // Create a Trip
+  // Create a Trip (Family Example)
   const trip = await Trip.create({
+    ownerUid: "aZlm3SLXkYfNGq3CuDmWTbmO3gF3",
     title: "Summer Fun in Bali",
-    destination:"Bali",
-    description: "A relaxing summer vacation with beach activities and hiking",
+    type: "Family", // 👈 required by schema
+    destination: "Bali",
     startDate: new Date("2025-06-10"),
     endDate: new Date("2025-06-20"),
     durationDays: 10,
-    ownerUid: "aZlm3SLXkYfNGq3CuDmWTbmO3gF3",
+    passengers: {
+      adults: 2,
+      children: 2,
+      total: 4
+    },
+    budget: 2000,
+    ecoSuggestions: true,
     weather: {
-    location: "Bali",
-    tempRange: "26°C - 32°C",
-    description: "Sunny with light breeze",
-    condition: "sunny",
-    highTemp: "32°C",
-    lowTemp: "26°C",
-    wind: "15 km/h",
-    humidity: "70%",
-    chanceRain: "10%"
-  }
+      location: "Bali",
+      tempRange: "26°C - 32°C",
+      description: "Sunny with light breeze",
+      condition: "sunny",
+      highTemp: "32°C",
+      lowTemp: "26°C",
+      wind: "15 km/h",
+      humidity: "70%",
+      chanceRain: "10%"
+    }
   });
 
   // Packing List with categories + items
@@ -39,36 +46,38 @@ async function seed() {
     title: "Bali Packing List",
     tripId: trip._id,
     ownerUid: "aZlm3SLXkYfNGq3CuDmWTbmO3gF3",
+    isAIGenerated: false,
+    lastAIGeneratedAt: null,
     categories: [
       {
         name: "Clothing",
         items: [
-          { name: "T-shirts", qty: 5, checked: false , eco:true},
-          { name: "Shorts", qty: 3, checked: true , eco:false},
-          { name: "Hiking Shoes", qty: 1, checked: false , eco:true}
+          { name: "T-shirts", qty: 8, checked: false, eco: true, suggestedByAI: false },
+          { name: "Shorts", qty: 4, checked: true, eco: false, suggestedByAI: false },
+          { name: "Hiking Shoes", qty: 2, checked: false, eco: true, suggestedByAI: false }
         ]
       },
       {
         name: "Essentials",
         items: [
-          { name: "Passport", qty: 1, checked: true , eco:true},
-          { name: "Travel Insurance", qty: 1, checked: false , eco:false}
+          { name: "Passport", qty: 4, checked: true, eco: false, suggestedByAI: false },
+          { name: "Travel Insurance", qty: 1, checked: false, eco: false, suggestedByAI: false }
         ]
       },
       {
         name: "Toiletries",
         items: [
-          { name: "Sunscreen", qty: 1, checked: false , eco:true},
-          { name: "Toothbrush", qty: 1, checked: true , eco:false},
-          { name: "Shampoo", qty: 1, checked: false , eco:true}
+          { name: "Sunscreen", qty: 1, checked: false, eco: true, suggestedByAI: false },
+          { name: "Toothbrush", qty: 4, checked: true, eco: true, suggestedByAI: false },
+          { name: "Shampoo", qty: 1, checked: false, eco: true, suggestedByAI: false }
         ]
       },
       {
         name: "Electronics",
         items: [
-          { name: "Phone Charger", qty: 1, checked: true , eco:false},
-          { name: "Camera", qty: 1, checked: false , eco:true},
-          { name: "Power Bank", qty: 1, checked: false , eco:true}
+          { name: "Phone Charger", qty: 2, checked: true, eco: false, suggestedByAI: false },
+          { name: "Camera", qty: 1, checked: false, eco: true, suggestedByAI: false },
+          { name: "Power Bank", qty: 2, checked: false, eco: true, suggestedByAI: false }
         ]
       }
     ]
@@ -96,7 +105,7 @@ async function seed() {
     }
   ]);
 
-  console.log("✅ Sample data inserted (Trips + PackingList with categories + News)!");
+  console.log("✅ Sample data inserted (Trips + PackingList + News)!");
   mongoose.connection.close();
 }
 

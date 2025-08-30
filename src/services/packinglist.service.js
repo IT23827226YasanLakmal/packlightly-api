@@ -1,6 +1,7 @@
 
+const Trip = require('../models/Trip');
 const PackingList = require('../models/PackingList');
-const ollamaService = require('./ollamaService');
+const ollamaService = require('../utils/ollamaService');
 
 
 async function create(data) { return PackingList.create(data); }

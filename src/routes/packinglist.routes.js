@@ -11,9 +11,9 @@ router.delete('/:id', verifyFirebaseToken, ctrl.remove);
 router.patch('/:id/category/:category', verifyFirebaseToken, ctrl.updateCategory);
 
 // Generate AI packing list for a trip
-router.post('/:tripId/ai-generate', ctrl.generateAIPackingList);
+router.post('/:tripId/ai-generate',verifyFirebaseToken, ctrl.generateAIPackingList);
 
 // Add AI suggestions to existing packing list
-router.post('/:id/ai-suggestions', ctrl.addAISuggestions);
+router.post('/:id/ai-suggestions', verifyFirebaseToken, ctrl.addAISuggestions);
 
 module.exports = router;
