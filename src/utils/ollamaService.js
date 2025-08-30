@@ -6,7 +6,7 @@ class OllamaService {
   constructor() {
     this.client = axios.create({
       baseURL: OLLAMA_BASE_URL,
-      timeout: 180000, // 3 min safety
+      timeout: 0, // disable timeout for streaming
     });
   }
 
@@ -14,21 +14,61 @@ class OllamaService {
     try {
       const prompt = this.createPackingPrompt(tripData);
 
-      const response = await this.client.post('/api/chat', {
-        model: 'phi3:mini',
-        stream: false,
-        messages: [
-          { role: "system", content: "You are a travel packing assistant. You must ONLY output valid JSON with a 'title' and 'categories' array, nothing else." },
-          { role: "user", content: prompt }
-        ],
-        options: {
-          temperature: 0.7,
-          top_p: 0.9,
+      // Streaming request
+      const response = await this.client.post(
+        '/api/chat',
+        {
+          model: 'qwen3:0.6b',
+          stream: true, // enable streaming
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a travel packing assistant. You must ONLY output valid JSON with a 'title' and 'categories' array, nothing else.",
+            },
+            { role: "user", content: prompt },
+          ],
+          options: {
+            temperature: 0.7,
+            top_p: 0.9,
+          },
+        },
+        {
+          responseType: 'stream',
         }
-      });
+      );
 
-      // Ollama chat API returns: { message: { role: "assistant", content: "..." } }
-      return this.parsePackingList(response.data.message?.content);
+      let fullResponse = '';
+
+      return new Promise((resolve, reject) => {
+        response.data.on('data', (chunk) => {
+          try {
+            const lines = chunk.toString().split('\n').filter(Boolean);
+            for (const line of lines) {
+              // Ollama streams JSON lines
+              const parsed = JSON.parse(line);
+              if (parsed?.message?.content) {
+                fullResponse += parsed.message.content;
+              }
+            }
+          } catch (err) {
+            console.error("Stream parse error:", err.message);
+          }
+        });
+
+        response.data.on('end', () => {
+          try {
+            const parsedList = this.parsePackingList(fullResponse);
+            resolve(parsedList);
+          } catch (err) {
+            reject(err);
+          }
+        });
+
+        response.data.on('error', (err) => {
+          reject(err);
+        });
+      });
     } catch (error) {
       console.error('Ollama API error:', error.message);
       throw new Error('Failed to generate packing suggestions');
@@ -115,26 +155,11 @@ Respond STRICTLY as a JSON object with this structure:
     return {
       title: "Default Packing List",
       categories: [
-        {
-          category: "Clothing",
-          items: ["T-shirts", "Pants", "Underwear", "Socks", "Jacket"]
-        },
-        {
-          category: "Electronics",
-          items: ["Phone", "Charger", "Power bank"]
-        },
-        {
-          category: "Toiletries",
-          items: ["Toothbrush", "Toothpaste", "Deodorant"]
-        },
-        {
-          category: "Documents",
-          items: ["ID/Passport", "Travel tickets", "Insurance documents"]
-        },
-        {
-          category: "Miscellaneous",
-          items: ["Water bottle", "Snacks", "First aid kit"]
-        }
+        { category: "Clothing", items: ["T-shirts", "Pants", "Underwear", "Socks", "Jacket"] },
+        { category: "Electronics", items: ["Phone", "Charger", "Power bank"] },
+        { category: "Toiletries", items: ["Toothbrush", "Toothpaste", "Deodorant"] },
+        { category: "Documents", items: ["ID/Passport", "Travel tickets", "Insurance documents"] },
+        { category: "Miscellaneous", items: ["Water bottle", "Snacks", "First aid kit"] }
       ]
     };
   }

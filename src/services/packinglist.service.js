@@ -65,7 +65,7 @@ async function generateAIPackingList(tripId, ownerUid) {
     const aiSuggestions = await ollamaService.generatePackingSuggestion(trip);
 
     // Convert AI suggestions to the required format
-    const categories = aiSuggestions.map(categoryData => ({
+    const categories = aiSuggestions.categories.map(categoryData => ({
       name: categoryData.category,
       items: categoryData.items.map(item => ({
         name: item,
