@@ -79,6 +79,7 @@ async function generateAIPackingList(tripId, ownerUid) {
     return await PackingList.create({
         tripId,
         ownerUid,
+        title,
         categories,
         isAIGenerated: true,
         lastAIGeneratedAt: new Date()

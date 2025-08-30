@@ -8,7 +8,7 @@ const PackingListSchema = new mongoose.Schema({
     {
       name: {
         type: String,
-        enum: ['Clothing', 'Essentials', 'Toiletries', 'Electronics'], // predefined categories
+        enum: ['Clothing', 'Toiletries', 'Electronics', 'Documents', 'Miscellaneous'],
         required: true
       },
       items: [
