@@ -18,7 +18,7 @@ class OllamaService {
         model: 'phi3:mini',
         stream: false,
         messages: [
-          { role: "system", content: "You are a travel packing assistant. You must ONLY output valid JSON, nothing else." },
+          { role: "system", content: "You are a travel packing assistant. You must ONLY output valid JSON with a 'title' and 'categories' array, nothing else." },
           { role: "user", content: prompt }
         ],
         options: {
@@ -38,6 +38,7 @@ class OllamaService {
   createPackingPrompt(tripData) {
     return `
 Suggest a comprehensive packing list for a ${tripData.type} trip to ${tripData.destination}.
+Also provide a creative title for this packing list in the 'title' field.
 
 Trip Details:
 - Destination: ${tripData.destination}
@@ -47,56 +48,59 @@ Trip Details:
 - Weather: ${tripData.weather.condition}, ${tripData.weather.tempRange}
 - Dates: ${tripData.startDate} to ${tripData.endDate}
 
-Respond STRICTLY as a JSON array of objects, with this exact schema:
-[
-  {
-    "category": "Clothing",
-    "items": [
-      { "name": "T-shirts (Adults)", "qty": ${Math.max(3, Math.ceil(tripData.durationDays / 2)) * tripData.passengers.adults}, "checked": false, "eco": false },
-      { "name": "T-shirts (Children)", "qty": ${tripData.durationDays * tripData.passengers.children}, "checked": false, "eco": false },
-      { "name": "Pants/Shorts (Adults)", "qty": ${Math.max(2, Math.ceil(tripData.durationDays / 3)) * tripData.passengers.adults}, "checked": false, "eco": false },
-      { "name": "Pants/Shorts (Children)", "qty": ${Math.ceil(tripData.durationDays / 2) * tripData.passengers.children}, "checked": false, "eco": false },
-      { "name": "Undergarments (Adults)", "qty": ${tripData.durationDays * tripData.passengers.adults}, "checked": false, "eco": false },
-      { "name": "Undergarments (Children)", "qty": ${Math.ceil(tripData.durationDays * 1.5) * tripData.passengers.children}, "checked": false, "eco": false },
-      { "name": "Socks (All)", "qty": ${tripData.durationDays * (tripData.passengers.adults + tripData.passengers.children)}, "checked": false, "eco": false },
-      { "name": "Sleepwear (Adults)", "qty": ${2 * tripData.passengers.adults}, "checked": false, "eco": false },
-      { "name": "Sleepwear (Children)", "qty": ${3 * tripData.passengers.children}, "checked": false, "eco": false }
-    ]
-  },
-  {
-    "category": "Electronics",
-    "items": [
-      { "name": "Phone & Charger", "qty": 1, "checked": false, "eco": false },
-      { "name": "Power Bank", "qty": 1, "checked": false, "eco": false }
-    ]
-  },
-  {
-    "category": "Toiletries",
-    "items": [
-      { "name": "Toothbrush", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": true },
-      { "name": "Shampoo", "qty": 1, "checked": false, "eco": true }
-    ]
-  },
-  {
-    "category": "Documents",
-    "items": [
-      { "name": "Passport", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": false },
-      { "name": "Tickets", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": false }
-    ]
-  },
-  {
-    "category": "Miscellaneous",
-    "items": [
-      { "name": "Reusable Water Bottle", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": true },
-      { "name": "Snacks", "qty": ${2 * (tripData.passengers.adults + tripData.passengers.children)}, "checked": false, "eco": false }
-    ]
-  }
-]`;
+Respond STRICTLY as a JSON object with this structure:
+{
+  "title": "Suggested Packing List Title",
+  "categories": [
+    {
+      "category": "Clothing",
+      "items": [
+        { "name": "T-shirts (Adults)", "qty": ${Math.max(3, Math.ceil(tripData.durationDays / 2)) * tripData.passengers.adults}, "checked": false, "eco": false },
+        { "name": "T-shirts (Children)", "qty": ${tripData.durationDays * tripData.passengers.children}, "checked": false, "eco": false },
+        { "name": "Pants/Shorts (Adults)", "qty": ${Math.max(2, Math.ceil(tripData.durationDays / 3)) * tripData.passengers.adults}, "checked": false, "eco": false },
+        { "name": "Pants/Shorts (Children)", "qty": ${Math.ceil(tripData.durationDays / 2) * tripData.passengers.children}, "checked": false, "eco": false },
+        { "name": "Undergarments (Adults)", "qty": ${tripData.durationDays * tripData.passengers.adults}, "checked": false, "eco": false },
+        { "name": "Undergarments (Children)", "qty": ${Math.ceil(tripData.durationDays * 1.5) * tripData.passengers.children}, "checked": false, "eco": false },
+        { "name": "Socks (All)", "qty": ${tripData.durationDays * (tripData.passengers.adults + tripData.passengers.children)}, "checked": false, "eco": false },
+        { "name": "Sleepwear (Adults)", "qty": ${2 * tripData.passengers.adults}, "checked": false, "eco": false },
+        { "name": "Sleepwear (Children)", "qty": ${3 * tripData.passengers.children}, "checked": false, "eco": false }
+      ]
+    },
+    {
+      "category": "Electronics",
+      "items": [
+        { "name": "Phone & Charger", "qty": 1, "checked": false, "eco": false },
+        { "name": "Power Bank", "qty": 1, "checked": false, "eco": false }
+      ]
+    },
+    {
+      "category": "Toiletries",
+      "items": [
+        { "name": "Toothbrush", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": true },
+        { "name": "Shampoo", "qty": 1, "checked": false, "eco": true }
+      ]
+    },
+    {
+      "category": "Documents",
+      "items": [
+        { "name": "Passport", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": false },
+        { "name": "Tickets", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": false }
+      ]
+    },
+    {
+      "category": "Miscellaneous",
+      "items": [
+        { "name": "Reusable Water Bottle", "qty": ${tripData.passengers.adults + tripData.passengers.children}, "checked": false, "eco": true },
+        { "name": "Snacks", "qty": ${2 * (tripData.passengers.adults + tripData.passengers.children)}, "checked": false, "eco": false }
+      ]
+    }
+  ]
+}`;
   }
 
   parsePackingList(response) {
     try {
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
@@ -108,28 +112,31 @@ Respond STRICTLY as a JSON array of objects, with this exact schema:
   }
 
   getDefaultPackingList() {
-    return [
-      {
-        category: "Clothing",
-        items: ["T-shirts", "Pants", "Underwear", "Socks", "Jacket"]
-      },
-      {
-        category: "Electronics",
-        items: ["Phone", "Charger", "Power bank"]
-      },
-      {
-        category: "Toiletries",
-        items: ["Toothbrush", "Toothpaste", "Deodorant"]
-      },
-      {
-        category: "Documents",
-        items: ["ID/Passport", "Travel tickets", "Insurance documents"]
-      },
-      {
-        category: "Miscellaneous",
-        items: ["Water bottle", "Snacks", "First aid kit"]
-      }
-    ];
+    return {
+      title: "Default Packing List",
+      categories: [
+        {
+          category: "Clothing",
+          items: ["T-shirts", "Pants", "Underwear", "Socks", "Jacket"]
+        },
+        {
+          category: "Electronics",
+          items: ["Phone", "Charger", "Power bank"]
+        },
+        {
+          category: "Toiletries",
+          items: ["Toothbrush", "Toothpaste", "Deodorant"]
+        },
+        {
+          category: "Documents",
+          items: ["ID/Passport", "Travel tickets", "Insurance documents"]
+        },
+        {
+          category: "Miscellaneous",
+          items: ["Water bottle", "Snacks", "First aid kit"]
+        }
+      ]
+    };
   }
 }
 

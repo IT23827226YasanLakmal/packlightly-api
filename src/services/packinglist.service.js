@@ -74,12 +74,11 @@ async function generateAIPackingList(tripId, ownerUid) {
         suggestedByAI: true
       }))
     }));
-
     
     return await PackingList.create({
         tripId,
         ownerUid,
-        title,
+        title:aiSuggestions.title || `${trip.destination} Packing List`,
         categories,
         isAIGenerated: true,
         lastAIGeneratedAt: new Date()
