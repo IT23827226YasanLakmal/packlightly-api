@@ -9,71 +9,43 @@ class OllamaService {
       timeout: 0, // disable timeout for streaming
     });
   }
+async generatePackingSuggestion(tripData) {
+  try {
+    const prompt = this.createPackingPrompt(tripData);
 
-  async generatePackingSuggestion(tripData) {
-    try {
-      const prompt = this.createPackingPrompt(tripData);
-
-      // Streaming request
-      const response = await this.client.post(
-        '/api/chat',
-        {
-          model: 'qwen3:0.6b',
-          stream: true, // enable streaming
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a travel packing assistant. You must ONLY output valid JSON with a 'title' and 'categories' array, nothing else.",
-            },
-            { role: "user", content: prompt },
-          ],
-          options: {
-            temperature: 0.7,
-            top_p: 0.9,
+    // Regular (non-streaming) request
+    const response = await this.client.post(
+      '/api/chat',
+      {
+        model: 'qwen3:0.6b',
+        stream: false, // Disable streaming
+        messages: [
+          {
+            role: "system",
+            content: "You are a travel packing assistant. You must ONLY output valid JSON with a 'title' and 'categories' array, nothing else.",
           },
+          { role: "user", content: prompt },
+        ],
+        options: {
+          temperature: 0.7,
+          top_p: 0.9,
         },
-        {
-          responseType: 'stream',
-        }
-      );
+      }
+    );
 
-      let fullResponse = '';
-
-      return new Promise((resolve, reject) => {
-        response.data.on('data', (chunk) => {
-          try {
-            const lines = chunk.toString().split('\n').filter(Boolean);
-            for (const line of lines) {
-              // Ollama streams JSON lines
-              const parsed = JSON.parse(line);
-              if (parsed?.message?.content) {
-                fullResponse += parsed.message.content;
-              }
-            }
-          } catch (err) {
-            console.error("Stream parse error:", err.message);
-          }
-        });
-
-        response.data.on('end', () => {
-          try {
-            const parsedList = this.parsePackingList(fullResponse);
-            resolve(parsedList);
-          } catch (err) {
-            reject(err);
-          }
-        });
-
-        response.data.on('error', (err) => {
-          reject(err);
-        });
-      });
-    } catch (error) {
-      console.error('Ollama API error:', error.message);
-      throw new Error('Failed to generate packing suggestions');
-    }
+    // Directly access the complete response
+    const aiResponse = response.data;
+    console.log('Ollama AI Response:', aiResponse);
+    
+    // Parse and return the packing list
+    const parsedList = this.parsePackingList(aiResponse);
+    return parsedList;
+    
+  } catch (error) {
+    console.error('Ollama API error:', error.message);
+    throw new Error('Failed to generate packing suggestions');
   }
+}
 
   createPackingPrompt(tripData) {
     return `
@@ -140,9 +112,16 @@ Respond STRICTLY as a JSON object with this structure:
 
   parsePackingList(response) {
     try {
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      // If response is the full object, extract the content
+      if (typeof response === 'object' && response.message && response.message.content) {
+        response = response.message.content;
+      }
+
+      // Extract JSON from the content, which may be wrapped in ```json
+      const jsonMatch = response.match(/```json\s*(\{[\s\S]*?\})\s*```/) || response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        const jsonString = jsonMatch[1] || jsonMatch[0];
+        return JSON.parse(jsonString);
       }
       throw new Error('No valid JSON found in response');
     } catch (error) {

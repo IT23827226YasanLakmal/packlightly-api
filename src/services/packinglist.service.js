@@ -64,25 +64,46 @@ async function generateAIPackingList(tripId, ownerUid) {
     // Generate AI suggestions
     const aiSuggestions = await ollamaService.generatePackingSuggestion(trip);
 
-    // Convert AI suggestions to the required format
     const categories = aiSuggestions.categories.map(categoryData => ({
       name: categoryData.category,
-      items: categoryData.items.map(item => ({
-        name: item,
-        qty: item.qty,
-        checked: false,
-        suggestedByAI: true
-      }))
+      items: categoryData.items.map(item => {
+        if (typeof item === 'object' && item.name) {
+          if (typeof item.name === 'object' && item.name.name) {
+            return {
+              name: item.name.name,
+              qty: item.name.qty || item.qty || 1,
+              checked: item.name.checked || item.checked || false,
+              eco: item.name.eco || item.eco || false,
+              suggestedByAI: true
+            };
+          } else {
+            return {
+              name: item.name,
+              qty: item.qty || 1,
+              checked: item.checked || false,
+              eco: item.eco || false,
+              suggestedByAI: true
+            };
+          }
+        }
+        return {
+          name: String(item),
+          qty: 1,
+          checked: false,
+          eco: false,
+          suggestedByAI: true
+        };
+      })
     }));
-    
+
     return await PackingList.create({
-        tripId,
-        ownerUid,
-        title:aiSuggestions.title || `${trip.destination} Packing List`,
-        categories,
-        isAIGenerated: true,
-        lastAIGeneratedAt: new Date()
-      });
+      tripId,
+      ownerUid,
+      title: aiSuggestions.title || `${trip.destination} Packing List`,
+      categories,
+      isAIGenerated: true,
+      lastAIGeneratedAt: new Date()
+    });
 
   } catch (error) {
     console.error('AI packing list generation error:', error);
@@ -117,17 +138,17 @@ async function addAISuggestions(id, ownerUid) {
     if (existingCategory) {
       // Add only new items from AI
       aiCategory.items.forEach(aiItem => {
+        let itemName = typeof aiItem === 'object' && aiItem.name ? (typeof aiItem.name === 'object' ? aiItem.name.name : aiItem.name) : aiItem;
         const itemExists = existingCategory.items.some(
-          item => item.name.toLowerCase() === aiItem.toLowerCase()
+          item => item.name.toLowerCase() === String(itemName).toLowerCase()
         );
-        
         if (!itemExists) {
           existingCategory.items.push({
-            name: aiItem,
-            quantity: 1,
-            packed: false,
-            essential: ollamaService.isEssentialItem(aiCategory.category, aiItem),
-            suggestedByAI: true
+            name: itemName,
+            quantity: aiItem.qty || aiItem.quantity || 1,
+            packed: typeof aiItem.checked === 'boolean' ? aiItem.checked : false,
+            essential: typeof aiItem.eco === 'boolean' ? aiItem.eco : ollamaService.isEssentialItem(aiCategory.category, itemName),
+            suggestedByAI: typeof aiItem.suggestedByAI === 'boolean' ? aiItem.suggestedByAI : true
           });
         }
       });
@@ -135,13 +156,16 @@ async function addAISuggestions(id, ownerUid) {
       // Create new category
       packingList.categories.push({
         name: aiCategory.category,
-        items: aiCategory.items.map(item => ({
-          name: item,
-          quantity: 1,
-          packed: false,
-          essential: ollamaService.isEssentialItem(aiCategory.category, item),
-          suggestedByAI: true
-        }))
+        items: aiCategory.items.map(aiItem => {
+          let itemName = typeof aiItem === 'object' && aiItem.name ? (typeof aiItem.name === 'object' ? aiItem.name.name : aiItem.name) : aiItem;
+          return {
+            name: itemName,
+            quantity: aiItem.qty || aiItem.quantity || 1,
+            packed: typeof aiItem.checked === 'boolean' ? aiItem.checked : false,
+            essential: typeof aiItem.eco === 'boolean' ? aiItem.eco : ollamaService.isEssentialItem(aiCategory.category, itemName),
+            suggestedByAI: typeof aiItem.suggestedByAI === 'boolean' ? aiItem.suggestedByAI : true
+          };
+        })
       });
     }
   });
