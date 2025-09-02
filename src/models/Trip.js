@@ -27,7 +27,6 @@ const TripSchema = new mongoose.Schema({
     enum: ["Solo", "Couple", "Family", "Group"],
     required: true
   },
-
   destination: String,
   startDate: Date,
   endDate: Date,
@@ -41,10 +40,7 @@ const TripSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  ecoSuggestions: {
-    type: Boolean,
-    default: false
-  },
+ 
   weather: {
     location: String,
     tempRange: String,

@@ -16,7 +16,7 @@ async function seed() {
   const trip = await Trip.create({
     ownerUid: "aZlm3SLXkYfNGq3CuDmWTbmO3gF3",
     title: "Summer Fun in Bali",
-    type: "Family", // 👈 required by schema
+    type: "Family", // must be one of: Solo, Couple, Family, Group
     destination: "Bali",
     startDate: new Date("2025-06-10"),
     endDate: new Date("2025-06-20"),
@@ -32,7 +32,7 @@ async function seed() {
       location: "Bali",
       tempRange: "26°C - 32°C",
       description: "Sunny with light breeze",
-      condition: "sunny",
+      condition: "sunny", // must be one of: sunny, cloudy, rainy, stormy, snowy
       highTemp: "32°C",
       lowTemp: "26°C",
       wind: "15 km/h",
@@ -58,13 +58,6 @@ async function seed() {
         ]
       },
       {
-        name: "Essentials",
-        items: [
-          { name: "Passport", qty: 4, checked: true, eco: false, suggestedByAI: false },
-          { name: "Travel Insurance", qty: 1, checked: false, eco: false, suggestedByAI: false }
-        ]
-      },
-      {
         name: "Toiletries",
         items: [
           { name: "Sunscreen", qty: 1, checked: false, eco: true, suggestedByAI: false },
@@ -78,6 +71,20 @@ async function seed() {
           { name: "Phone Charger", qty: 2, checked: true, eco: false, suggestedByAI: false },
           { name: "Camera", qty: 1, checked: false, eco: true, suggestedByAI: false },
           { name: "Power Bank", qty: 2, checked: false, eco: true, suggestedByAI: false }
+        ]
+      },
+      {
+        name: "Documents",
+        items: [
+          { name: "Passport", qty: 4, checked: true, eco: false, suggestedByAI: false },
+          { name: "Travel Insurance", qty: 1, checked: false, eco: false, suggestedByAI: false }
+        ]
+      },
+      {
+        name: "Miscellaneous",
+        items: [
+          { name: "Reusable Water Bottle", qty: 2, checked: true, eco: true, suggestedByAI: false },
+          { name: "Snacks", qty: 10, checked: false, eco: false, suggestedByAI: false }
         ]
       }
     ]
@@ -106,7 +113,7 @@ async function seed() {
   ]);
 
   console.log("✅ Sample data inserted (Trips + PackingList + News)!");
-  mongoose.connection.close();
+  await mongoose.connection.close();
 }
 
 seed().catch((err) => console.error(err));
