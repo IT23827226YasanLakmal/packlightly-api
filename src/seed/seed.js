@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Trip = require("../models/Trip");
 const PackingList = require("../models/PackingList");
 const News = require("../models/News");
+const Product = require("../models/Product"); // ✅ import Product model
 const connectDB = require("../config/db");
 
 async function seed() {
@@ -11,12 +12,13 @@ async function seed() {
   await Trip.deleteMany({});
   await PackingList.deleteMany({});
   await News.deleteMany({});
+  await Product.deleteMany({}); // ✅ clear products too
 
   // Create a Trip (Family Example)
   const trip = await Trip.create({
     ownerUid: "aZlm3SLXkYfNGq3CuDmWTbmO3gF3",
     title: "Summer Fun in Bali",
-    type: "Family", // must be one of: Solo, Couple, Family, Group
+    type: "Family",
     destination: "Bali",
     startDate: new Date("2025-06-10"),
     endDate: new Date("2025-06-20"),
@@ -32,7 +34,7 @@ async function seed() {
       location: "Bali",
       tempRange: "26°C - 32°C",
       description: "Sunny with light breeze",
-      condition: "sunny", // must be one of: sunny, cloudy, rainy, stormy, snowy
+      condition: "sunny",
       highTemp: "32°C",
       lowTemp: "26°C",
       wind: "15 km/h",
@@ -112,7 +114,62 @@ async function seed() {
     }
   ]);
 
-  console.log("✅ Sample data inserted (Trips + PackingList + News)!");
+  // ✅ Eco Products with explicit timestamps
+const now = new Date();
+await Product.insertMany([
+  {
+    name: "Reusable Water Bottle",
+    price: 1200,
+    category: 1,
+    eco: 5,
+    description: "Stainless steel reusable water bottle, eco-friendly and durable.",
+    availableLocation: ["Colombo", "Kandy", "Galle"],
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    name: "Bamboo Toothbrush",
+    price: 350,
+    category: 2,
+    eco: 5,
+    description: "Biodegradable bamboo toothbrush with soft bristles.",
+    availableLocation: ["Colombo", "Negombo"],
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    name: "Organic Cotton T-Shirt",
+    price: 2500,
+    category: 3,
+    eco: 4,
+    description: "Eco-conscious cotton T-shirt made with sustainable materials.",
+    availableLocation: ["Colombo", "Jaffna", "Matara"],
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    name: "Solar Powered Lamp",
+    price: 5200,
+    category: 4,
+    eco: 5,
+    description: "Portable solar-powered LED lamp for indoor and outdoor use.",
+    availableLocation: ["Colombo", "Anuradhapura", "Kurunegala"],
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    name: "Recycled Notebook",
+    price: 450,
+    category: 5,
+    eco: 3,
+    description: "Notebook made from 100% recycled paper with eco-friendly ink.",
+    availableLocation: ["Colombo", "Gampaha"],
+    createdAt: now,
+    updatedAt: now
+  }
+]);
+
+  console.log("✅ Sample data inserted (Trips + PackingList + News + Products)!");
   await mongoose.connection.close();
 }
 

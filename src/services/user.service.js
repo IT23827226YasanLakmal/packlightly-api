@@ -1,18 +1,43 @@
-const User = require('../models/User');
+const admin = require("../config/firebase");
+const db = admin.firestore();
 
-async function upsertFromFirebase(userObj) {
-  const filter = { uid: userObj.uid };
-  const update = {
-    email: userObj.email,
-    displayName: userObj.name || userObj.displayName,
-    photoURL: userObj.picture || userObj.photoURL,
-    uid: userObj.uid
-  };
-  return User.findOneAndUpdate(filter, update, { upsert: true, new: true });
+class UserService {
+  // Get Firebase user by UID
+  static async getFirebaseUser(uid) {
+    return await admin.auth().getUser(uid);
+  }
+
+  // List Firebase users (max 1000 at once)
+  static async listFirebaseUsers(limit = 1000, pageToken) {
+    return await admin.auth().listUsers(limit, pageToken);
+  }
+
+  // Get user profile from Firestore by UID
+  static async getFirestoreUserProfile(uid) {
+    const userDoc = await db.collection('users').doc(uid).get();
+    return userDoc.exists ? userDoc.data() : null;
+  }
+
+  // Create or update user profile in Firestore
+  static async setFirestoreUserProfile(uid, profileData) {
+    await db.collection('users').doc(uid).set(profileData, { merge: true });
+    return await this.getFirestoreUserProfile(uid);
+  }
+
+  // Merge Firebase Auth & Firestore profile
+  static async getFullUserDetails(uid) {
+    const firebaseUser = await this.getFirebaseUser(uid);
+    const profile = await this.getFirestoreUserProfile(uid);
+    return {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName,
+      emailVerified: firebaseUser.emailVerified,
+      role: profile && profile.role ? profile.role : "not_assigned",
+      createdAt: profile && profile.createdAt ? profile.createdAt : firebaseUser.metadata.creationTime,
+      ...profile // spread any additional profile fields
+    };
+  }
 }
 
-async function getByUid(uid) {
-  return User.findOne({ uid });
-}
-
-module.exports = { upsertFromFirebase, getByUid };
+module.exports = UserService;

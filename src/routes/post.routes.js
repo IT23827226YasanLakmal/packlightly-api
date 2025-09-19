@@ -1,11 +1,15 @@
-const router = require('express').Router();
-const ctrl = require('../controllers/post.controller');
-const { verifyFirebaseToken } = require('../middlewares/auth.middleware');
+const express = require("express");
+const router = express.Router();
+const postController = require("../controllers/post.controller");
 
-router.get('/', ctrl.list); // public
-router.post('/', verifyFirebaseToken, ctrl.create);
-router.get('/:id', ctrl.get);
-router.put('/:id', verifyFirebaseToken, ctrl.update);
-router.delete('/:id', verifyFirebaseToken, ctrl.remove);
+// Posts CRUD
+router.get("/", postController.getAll);
+router.get("/:id", postController.getOne);
+router.post("/", postController.create);
+router.put("/:id", postController.update);
+router.delete("/:id", postController.delete);
+
+// Add comment
+router.post("/:id/comments", postController.addComment);
 
 module.exports = router;

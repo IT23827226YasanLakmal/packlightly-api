@@ -1,9 +1,64 @@
-const svc = require('../services/post.service');
+const postService = require("../services/post.service");
 
-async function create(req, res, next) { try { const payload = { ...req.body, authorUid: req.user.uid }; res.status(201).json(await svc.create(payload)); } catch(e){next(e);} }
-async function list(req, res, next) { try { res.json(await svc.list()); } catch(e){next(e);} }
-async function get(req, res, next) { try { res.json(await svc.get(req.params.id)); } catch(e){next(e);} }
-async function update(req, res, next) { try { res.json(await svc.update(req.params.id, req.body)); } catch(e){next(e);} }
-async function remove(req, res, next) { try { await svc.remove(req.params.id); res.json({ success: true }); } catch(e){next(e);} }
+class PostController {
+  async getAll(req, res) {
+    try {
+      const posts = await postService.getAllPosts();
+      res.json(posts);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
 
-module.exports = { create, list, get, update, remove };
+  async getOne(req, res) {
+    try {
+      const post = await postService.getPostById(req.params.id);
+      if (!post) return res.status(404).json({ error: "Post not found" });
+      res.json(post);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  async create(req, res) {
+    try {
+      const newPost = await postService.createPost(req.body);
+      res.status(201).json(newPost);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  async update(req, res) {
+    try {
+      const updatedPost = await postService.updatePost(req.params.id, req.body);
+      if (!updatedPost) return res.status(404).json({ error: "Post not found" });
+      res.json(updatedPost);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  }
+
+  async delete(req, res) {
+    try {
+      const deletedPost = await postService.deletePost(req.params.id);
+      if (!deletedPost) return res.status(404).json({ error: "Post not found" });
+      res.json({ message: "Post deleted successfully" });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+  async addComment(req, res) {
+    try {
+      const { user, text } = req.body;
+      if (!user || !text) return res.status(400).json({ error: "Missing comment data" });
+      const post = await postService.addComment(req.params.id, { user, text });
+      res.json(post);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+}
+
+module.exports = new PostController();
