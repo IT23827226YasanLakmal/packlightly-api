@@ -29,6 +29,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/users', userRoutes);
+app.use("/uploads", express.static("uploads")); // serve uploaded images
 
 app.use(errorHandler);
 

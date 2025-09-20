@@ -1,40 +1,32 @@
 const Post = require("../models/Post");
 
-class PostService {
-  // Get all posts
-  async getAllPosts() {
-    return await Post.find().sort({ date: -1 });
-  }
+exports.createPost = async (data) => {
+  const post = new Post(data);
+  return await post.save();
+};
 
-  // Get single post by ID
-  async getPostById(id) {
-    return await Post.findById(id);
-  }
+exports.getPosts = async () => {
+  return await Post.find().sort({ date: -1 });
+};
 
-  // Create a new post
-  async createPost(postData) {
-    const post = new Post(postData);
-    return await post.save();
-  }
+exports.getPostsByOwner = async (ownerUid) => {
+  return await Post.find({ ownerUid }).sort({ date: -1 });
+};
 
-  // Update existing post
-  async updatePost(id, postData) {
-    return await Post.findByIdAndUpdate(id, postData, { new: true });
-  }
+exports.getPostById = async (id) => {
+  return await Post.findById(id);
+};
 
-  // Delete post
-  async deletePost(id) {
-    return await Post.findByIdAndDelete(id);
-  }
+exports.updatePost = async (id, data) => {
+  return await Post.findByIdAndUpdate(id, data, { new: true });
+};
 
-  // Add a comment to a post
-  async addComment(postId, comment) {
-    const post = await Post.findById(postId);
-    if (!post) throw new Error("Post not found");
-    post.comments.push(comment);
-    await post.save();
-    return post;
-  }
-}
+exports.deletePost = async (id) => {
+  return await Post.findByIdAndDelete(id);
+};
 
-module.exports = new PostService();
+exports.addComment = async (postId, comment) => {
+  const post = await Post.findById(postId);
+  post.comments.push(comment);
+  return await post.save();
+};
