@@ -45,11 +45,7 @@ const TripSchema = new mongoose.Schema({
     location: String,
     tempRange: String,
     description: String,
-    condition: {
-      type: String,
-      enum: ['sunny', 'cloudy', 'rainy', 'stormy', 'snowy'],
-      default: 'sunny'
-    },
+    condition:String,
     highTemp: String,
     lowTemp: String,
     wind: String,
