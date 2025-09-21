@@ -8,8 +8,10 @@ const tripRoutes = require('./routes/trip.routes');
 const packinglistRoutes = require('./routes/packinglist.routes');
 const productRoutes = require('./routes/product.routes');
 const postRoutes = require('./routes/post.routes');
+
 const newsRoutes = require('./routes/news.routes');
 const userRoutes = require('./routes/user.routes');
+const uploadRoutes = require('./routes/upload.routes');
 
 const { errorHandler } = require('./middlewares/error.middleware');
 
@@ -29,7 +31,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/users', userRoutes);
-app.use("/uploads", express.static("uploads")); // serve uploaded images
+app.use('/api/upload', uploadRoutes);
 
 app.use(errorHandler);
 

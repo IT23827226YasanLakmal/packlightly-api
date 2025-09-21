@@ -3,6 +3,10 @@ const postController = require("../controllers/post.controller");
 const { verifyFirebaseToken } = require("../middlewares/auth.middleware");
 const upload = require("../middlewares/upload");
 
+// Like/unlike
+router.post("/:id/like", verifyFirebaseToken, postController.like);
+router.post("/:id/unlike", verifyFirebaseToken, postController.unlike);
+
 // CRUD
 router.get("/", postController.list); // Public route - anyone can view posts
 router.get("/my", verifyFirebaseToken, postController.getMyPosts); // Get user's own posts

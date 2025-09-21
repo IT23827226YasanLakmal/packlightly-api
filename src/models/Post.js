@@ -5,10 +5,11 @@
     description: { type: String, required: true },
     ownerUid: { type: String, required: true }, // Firebase user UID who owns this post
     tags: [{ type: String }],
-    status: { type: String, enum: ["Draft", "Published"], default: "Draft" },
-    date: { type: Date, default: Date.now },
-    imageUrl: { type: String, default: "" }, // store image path or URL
-    comments: [
+  status: { type: String, enum: ["Draft", "Published"], default: "Draft" },
+  date: { type: Date, default: Date.now },
+  imageUrl: { type: String, default: "" }, // store image path or URL
+  likeCount: { type: Number, default: 0 },
+  comments: [
       {
         user: String,
         text: String,

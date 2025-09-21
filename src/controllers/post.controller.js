@@ -1,4 +1,25 @@
+
 const postService = require("../services/post.service");
+
+exports.like = async (req, res) => {
+  try {
+    const post = await postService.likePost(req.params.id);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    res.json(post);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.unlike = async (req, res) => {
+  try {
+    const post = await postService.unlikePost(req.params.id);
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    res.json(post);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
 exports.create = async (req, res) => {
   try {
@@ -84,9 +105,17 @@ exports.delete = async (req, res) => {
 
 exports.addComment = async (req, res) => {
   try {
-    const comment = { user: req.body.user, text: req.body.text };
-    const post = await postService.addComment(req.params.id, comment);
-    res.json(post);
+    const { user, text } = req.body;
+    if (!user || !text) {
+      return res.status(400).json({ error: "Missing user or text in comment." });
+    }
+    const post = await postService.getPostById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ error: "Post not found." });
+    }
+    const comment = { user, text };
+    const updatedPost = await postService.addComment(req.params.id, comment);
+    res.json(updatedPost);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

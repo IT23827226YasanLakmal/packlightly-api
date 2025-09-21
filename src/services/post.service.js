@@ -1,3 +1,10 @@
+exports.likePost = async (id) => {
+  return await Post.findByIdAndUpdate(id, { $inc: { likeCount: 1 } }, { new: true });
+};
+
+exports.unlikePost = async (id) => {
+  return await Post.findByIdAndUpdate(id, { $inc: { likeCount: -1 } }, { new: true });
+};
 const Post = require("../models/Post");
 
 exports.createPost = async (data) => {
@@ -27,6 +34,17 @@ exports.deletePost = async (id) => {
 
 exports.addComment = async (postId, comment) => {
   const post = await Post.findById(postId);
+  if (!post) {
+    throw new Error('Post not found');
+  }
+  if (!Array.isArray(post.comments)) {
+    post.comments = [];
+  }
   post.comments.push(comment);
-  return await post.save();
+  try {
+    return await post.save();
+  } catch (err) {
+    console.error('Error saving comment:', err);
+    throw err;
+  }
 };
