@@ -10,5 +10,6 @@ router.get("/", verifyFirebaseToken, UserController.listUsers);       // List al
 router.post("/", verifyFirebaseToken, UserController.createUser);     // Create or update user profile in Firestore
 router.put("/:uid", verifyFirebaseToken, UserController.updateUser);   // Update user profile in Firestore
 router.patch("/:uid", verifyFirebaseToken, UserController.patchUser);  // Partial update (PATCH) user profile in Firestore
+router.delete("/:uid", verifyFirebaseToken, UserController.deleteUser); // Delete user from Firebase Auth and Firestore
 
 module.exports = router;

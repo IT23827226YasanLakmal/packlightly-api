@@ -7,6 +7,18 @@ class UserService {
     return await admin.auth().getUser(uid);
   }
 
+  // Create a new Firebase user
+  static async createFirebaseUser({ email, password, displayName, phoneNumber, ...otherData }) {
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName,
+      phoneNumber,
+      emailVerified: false
+    });
+    return userRecord;
+  }
+
   // List Firebase users (max 1000 at once)
   static async listFirebaseUsers(limit = 1000, pageToken) {
     return await admin.auth().listUsers(limit, pageToken);
@@ -37,6 +49,21 @@ class UserService {
       createdAt: profile && profile.createdAt ? profile.createdAt : firebaseUser.metadata.creationTime,
       ...profile // spread any additional profile fields
     };
+  }
+
+  // Delete user from Firebase Auth and Firestore
+  static async deleteUser(uid) {
+    try {
+      // Delete from Firebase Auth
+      await admin.auth().deleteUser(uid);
+      
+      // Delete from Firestore
+      await db.collection('users').doc(uid).delete();
+      
+      return { success: true, message: 'User deleted successfully' };
+    } catch (error) {
+      throw new Error(`Failed to delete user: ${error.message}`);
+    }
   }
 }
 

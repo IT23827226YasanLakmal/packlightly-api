@@ -1,4 +1,5 @@
 const admin = require("../config/firebase");
+const UserService = require("../services/user.service");
 
 async function verifyFirebaseToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -11,7 +12,17 @@ async function verifyFirebaseToken(req, res, next) {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
-    req.user = decodedToken; // Attach decoded user info
+    
+    // Fetch user profile from Firestore to get role information
+    const userProfile = await UserService.getFirestoreUserProfile(decodedToken.uid);
+    
+    // Merge Firebase token data with Firestore profile data
+    req.user = {
+      ...decodedToken,
+      role: userProfile && userProfile.role ? userProfile.role : 'user', // Default to 'user' if no role set
+      ...userProfile
+    };
+    
     next();
   } catch (error) {
     console.error("Token verification failed:", error);
