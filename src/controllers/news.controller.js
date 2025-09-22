@@ -22,6 +22,18 @@ class NewsController {
     }
   }
 
+  // Create a news article
+  async create(req, res) {
+    try {
+      console.log('DEBUG: Incoming news create request body:', req.body);
+      const news = await newsService.createNews(req.body);
+      res.status(201).json({ success: true, news });
+    } catch (err) {
+      console.error('DEBUG: Error creating news:', err);
+  res.status(500).json({ success: false, message: err.message, error: err, stack: err.stack });
+    }
+  }
+
   // Update a news article
   async update(req, res) {
     try {

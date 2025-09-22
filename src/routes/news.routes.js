@@ -4,6 +4,9 @@ const { NewsController } = require("../controllers/news.controller");
 const router = express.Router();
 const newsController = new NewsController();
 
+// Create news
+router.post("/", newsController.create.bind(newsController));
+
 // Fetch from NewsData.io and save to DB
 router.get("/fetch", newsController.fetchAndSave.bind(newsController));
 

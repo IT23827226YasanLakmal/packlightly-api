@@ -41,6 +41,13 @@ class NewsService {
     await News.findByIdAndDelete(id);
     return { success: true };
   }
+
+  // Create a news article
+  async createNews(newsData) {
+    const news = new News(newsData);
+    await news.save();
+    return news;
+  }
 }
 
 module.exports = { NewsService };
