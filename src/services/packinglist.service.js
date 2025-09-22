@@ -33,9 +33,9 @@ async function updateCategoryItems(id, category, items, ownerUid) {
       name: category,
       items: items.map(item => ({
         name: item.name || item,
-        quantity: item.quantity || 1,
-        packed: item.packed || false,
-        essential: item.essential || ollamaService.isEssentialItem(category, item.name || item),
+        qty: item.qty || item.quantity || 1,
+        checked: item.checked || item.packed || false,
+        eco: item.eco || false,
         suggestedByAI: item.suggestedByAI || false
       }))
     });
@@ -43,9 +43,9 @@ async function updateCategoryItems(id, category, items, ownerUid) {
     // Update existing category
     packingList.categories[categoryIndex].items = items.map(item => ({
       name: item.name || item,
-      quantity: item.quantity || 1,
-      packed: item.packed || false,
-      essential: item.essential || ollamaService.isEssentialItem(category, item.name || item),
+      qty: item.qty || item.quantity || 1,
+      checked: item.checked || item.packed || false,
+      eco: item.eco || false,
       suggestedByAI: item.suggestedByAI || false
     }));
   }
@@ -130,7 +130,7 @@ async function addAISuggestions(id, ownerUid) {
   const aiSuggestions = await ollamaService.generatePackingSuggestion(trip);
 
   // Merge AI suggestions with existing list
-  aiSuggestions.forEach(aiCategory => {
+  aiSuggestions.categories.forEach(aiCategory => {
     const existingCategory = packingList.categories.find(
       cat => cat.name === aiCategory.category
     );
@@ -145,9 +145,9 @@ async function addAISuggestions(id, ownerUid) {
         if (!itemExists) {
           existingCategory.items.push({
             name: itemName,
-            quantity: aiItem.qty || aiItem.quantity || 1,
-            packed: typeof aiItem.checked === 'boolean' ? aiItem.checked : false,
-            essential: typeof aiItem.eco === 'boolean' ? aiItem.eco : ollamaService.isEssentialItem(aiCategory.category, itemName),
+            qty: aiItem.qty || aiItem.quantity || 1,
+            checked: typeof aiItem.checked === 'boolean' ? aiItem.checked : false,
+            eco: typeof aiItem.eco === 'boolean' ? aiItem.eco : false,
             suggestedByAI: typeof aiItem.suggestedByAI === 'boolean' ? aiItem.suggestedByAI : true
           });
         }
@@ -160,9 +160,9 @@ async function addAISuggestions(id, ownerUid) {
           let itemName = typeof aiItem === 'object' && aiItem.name ? (typeof aiItem.name === 'object' ? aiItem.name.name : aiItem.name) : aiItem;
           return {
             name: itemName,
-            quantity: aiItem.qty || aiItem.quantity || 1,
-            packed: typeof aiItem.checked === 'boolean' ? aiItem.checked : false,
-            essential: typeof aiItem.eco === 'boolean' ? aiItem.eco : ollamaService.isEssentialItem(aiCategory.category, itemName),
+            qty: aiItem.qty || aiItem.quantity || 1,
+            checked: typeof aiItem.checked === 'boolean' ? aiItem.checked : false,
+            eco: typeof aiItem.eco === 'boolean' ? aiItem.eco : false,
             suggestedByAI: typeof aiItem.suggestedByAI === 'boolean' ? aiItem.suggestedByAI : true
           };
         })
@@ -176,4 +176,117 @@ async function addAISuggestions(id, ownerUid) {
   return await packingList.save();
 }
 
-module.exports = { create, list, get, update, remove, updateCategoryItems, generateAIPackingList, addAISuggestions };
+async function updateChecklistItem(packingListId, categoryName, itemId, itemData, ownerUid) {
+  const packingList = await PackingList.findById(packingListId);
+  
+  if (!packingList) {
+    throw new Error('Packing list not found');
+  }
+
+  // Check ownership
+  if (packingList.ownerUid !== ownerUid) {
+    throw new Error('Access denied');
+  }
+
+  // Find the category
+  const category = packingList.categories.find(cat => cat.name === categoryName);
+  if (!category) {
+    throw new Error('Category not found');
+  }
+
+  // Find the item
+  const item = category.items.id(itemId);
+  if (!item) {
+    throw new Error('Item not found');
+  }
+
+  // Update item properties
+  if (itemData.name !== undefined) item.name = itemData.name;
+  if (itemData.qty !== undefined) item.qty = itemData.qty;
+  if (itemData.checked !== undefined) item.checked = itemData.checked;
+  if (itemData.eco !== undefined) item.eco = itemData.eco;
+
+  return await packingList.save();
+}
+
+async function updateCheckedStatus(packingListId, categoryName, itemId, checked, ownerUid) {
+  const packingList = await PackingList.findById(packingListId);
+  
+  if (!packingList) {
+    throw new Error('Packing list not found');
+  }
+
+  // Check ownership
+  if (packingList.ownerUid !== ownerUid) {
+    throw new Error('Access denied');
+  }
+
+  // Find the category
+  const category = packingList.categories.find(cat => cat.name === categoryName);
+  if (!category) {
+    throw new Error('Category not found');
+  }
+
+  // Find the item
+  const item = category.items.id(itemId);
+  if (!item) {
+    throw new Error('Item not found');
+  }
+
+  // Update checked status
+  item.checked = checked;
+
+  return await packingList.save();
+}
+
+async function generateAISuggestion(packingListId, ownerUid) {
+  try {
+    // Get packing list first to get the trip data
+    const packingList = await PackingList.findById(packingListId);
+    if (!packingList) {
+      throw new Error('Packing list not found');
+    }
+
+    // Verify packing list ownership
+    if (packingList.ownerUid !== ownerUid) {
+      throw new Error('Access denied: You can only generate suggestions for your own packing lists');
+    }
+
+    // Get trip data using the tripId from the packing list
+    const trip = await Trip.findById(packingList.tripId);
+    if (!trip) {
+      throw new Error('Trip not found');
+    }
+
+    // Generate AI suggestions using ollamaService
+    const aiSuggestions = await ollamaService.generatePackingSuggestion(trip);
+
+    // Return the raw AI suggestions without creating a packing list
+    return {
+      packingListId: packingListId,
+      tripId: packingList.tripId,
+      tripDestination: trip.destination,
+      tripDuration: trip.duration,
+      suggestions: aiSuggestions,
+      generatedAt: new Date()
+    };
+
+  } catch (error) {
+    console.error('AI suggestion generation error:', error);
+    throw new Error('Failed to generate AI suggestions: ' + error.message);
+  }
+}
+
+module.exports = { 
+  create, 
+  list, 
+  get, 
+  update, 
+  remove, 
+  updateCategoryItems, 
+  generateAIPackingList, 
+  addAISuggestions,
+  updateChecklistItem,
+  updateCheckedStatus,
+  generateAISuggestion
+};

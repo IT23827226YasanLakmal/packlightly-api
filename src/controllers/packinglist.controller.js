@@ -17,7 +17,7 @@ async function updateCategory (req, res) {
     const { items } = req.body;
     
     // Validate category
-    const validCategories = ['Clothing', 'Essentials', 'Toiletries', 'Electronics'];
+    const validCategories = ['Clothing', 'Toiletries', 'Electronics', 'Documents', 'Miscellaneous'];
     if (!validCategories.includes(category)) {
       return res.status(400).json({ error: 'Invalid category' });
     }
@@ -31,6 +31,7 @@ async function updateCategory (req, res) {
     
     res.json(packingList);
   } catch (error) {
+    console.error('Update category error:', error);
     if (error.message === 'Packing list not found') {
       return res.status(404).json({ error: error.message });
     }
@@ -72,8 +73,103 @@ async function addAISuggestions(req, res) {
         message: 'AI suggestions added successfully'
       });
     } catch (error) {
+      console.error('Add AI suggestions error:', error);
+      if (error.message === 'Packing list not found' || error.message === 'Trip not found') {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message === 'Access denied') {
+        return res.status(403).json({ error: error.message });
+      }
       res.status(500).json({ error: error.message });
     }
   }
 
-module.exports = { create, list, get, update, remove, updateCategory, generateAIPackingList, addAISuggestions };
+async function updateChecklistItem(req, res) {
+  try {
+    const { id, category, itemId } = req.params;
+    const itemData = req.body;
+    const ownerUid = req.user.uid;
+
+    const packingList = await svc.updateChecklistItem(id, category, itemId, itemData, ownerUid);
+    res.json({
+      success: true,
+      data: packingList,
+      message: 'Checklist item updated successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Packing list not found' || error.message === 'Category not found' || error.message === 'Item not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message === 'Access denied') {
+      return res.status(403).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function updateCheckedStatus(req, res) {
+  try {
+    const { id, category, itemId } = req.params;
+    const { checked } = req.body;
+    const ownerUid = req.user.uid;
+
+    // Validate checked value
+    if (typeof checked !== 'boolean') {
+      return res.status(400).json({ error: 'Checked status must be a boolean value' });
+    }
+
+    const packingList = await svc.updateCheckedStatus(id, category, itemId, checked, ownerUid);
+    res.json({
+      success: true,
+      data: packingList,
+      message: 'Checked status updated successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Packing list not found' || error.message === 'Category not found' || error.message === 'Item not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message === 'Access denied') {
+      return res.status(403).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function generateAISuggestion(req, res) {
+  try {
+    const { id } = req.params;
+    const ownerUid = req.user.uid;
+
+    const suggestions = await svc.generateAISuggestion(id, ownerUid);
+    res.json({
+      success: true,
+      data: suggestions,
+      message: 'AI suggestions generated successfully'
+    });
+  } catch (error) {
+    console.error('Generate AI suggestions error:', error);
+    if (error.message.includes('Packing list not found') || error.message.includes('Trip not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message.includes('Access denied')) {
+      return res.status(403).json({ error: error.message });
+    }
+    res.status(500).json({ 
+      error: error.message || 'Failed to generate AI suggestions' 
+    });
+  }
+}
+
+module.exports = { 
+  create, 
+  list, 
+  get, 
+  update, 
+  remove, 
+  updateCategory, 
+  generateAIPackingList, 
+  addAISuggestions,
+  updateChecklistItem,
+  updateCheckedStatus,
+  generateAISuggestion
+};
