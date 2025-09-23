@@ -20,7 +20,7 @@ Thumbs.db
 dist/
 build/
 out/
-
+uploads/
 # IDE files
 .vscode/
 .idea/
