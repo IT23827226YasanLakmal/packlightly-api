@@ -9,6 +9,7 @@
   date: { type: Date, default: Date.now },
   imageUrl: { type: String, default: "" }, // store image path or URL
   likeCount: { type: Number, default: 0 },
+  likedBy: [{ type: String }], // Array of Firebase user UIDs who liked this post
   comments: [
       {
         user: String,

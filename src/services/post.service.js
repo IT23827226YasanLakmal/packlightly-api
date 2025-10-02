@@ -1,9 +1,48 @@
-exports.likePost = async (id) => {
-  return await Post.findByIdAndUpdate(id, { $inc: { likeCount: 1 } }, { new: true });
+exports.likePost = async (id, userUid) => {
+  const post = await Post.findById(id);
+  if (!post) {
+    return { post: null };
+  }
+  
+  // Check if user has already liked this post
+  if (post.likedBy.includes(userUid)) {
+    return { post, alreadyLiked: true };
+  }
+  
+  // Add user to likedBy array and increment like count
+  post.likedBy.push(userUid);
+  post.likeCount += 1;
+  
+  const updatedPost = await post.save();
+  return { post: updatedPost, alreadyLiked: false };
 };
 
-exports.unlikePost = async (id) => {
-  return await Post.findByIdAndUpdate(id, { $inc: { likeCount: -1 } }, { new: true });
+exports.unlikePost = async (id, userUid) => {
+  const post = await Post.findById(id);
+  if (!post) {
+    return { post: null };
+  }
+  
+  // Check if user has actually liked this post
+  const likedIndex = post.likedBy.indexOf(userUid);
+  if (likedIndex === -1) {
+    return { post, notLiked: true };
+  }
+  
+  // Remove user from likedBy array and decrement like count
+  post.likedBy.splice(likedIndex, 1);
+  post.likeCount = Math.max(0, post.likeCount - 1); // Ensure count doesn't go below 0
+  
+  const updatedPost = await post.save();
+  return { post: updatedPost, notLiked: false };
+};
+
+exports.hasUserLikedPost = async (postId, userUid) => {
+  const post = await Post.findById(postId);
+  if (!post) {
+    return false;
+  }
+  return post.likedBy.includes(userUid);
 };
 const Post = require("../models/Post");
 

@@ -6,6 +6,7 @@ const upload = require("../middlewares/upload");
 // Like/unlike
 router.post("/:id/like", verifyFirebaseToken, postController.like);
 router.post("/:id/unlike", verifyFirebaseToken, postController.unlike);
+router.get("/:id/like-status", verifyFirebaseToken, postController.checkLikeStatus);
 
 // CRUD
 router.get("/", postController.list); // Public route - anyone can view posts

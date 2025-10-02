@@ -3,9 +3,15 @@ const postService = require("../services/post.service");
 
 exports.like = async (req, res) => {
   try {
-    const post = await postService.likePost(req.params.id);
-    if (!post) return res.status(404).json({ error: "Post not found" });
-    res.json(post);
+    const userUid = req.user.uid; // Get user UID from Firebase auth middleware
+    const result = await postService.likePost(req.params.id, userUid);
+    if (!result.post) return res.status(404).json({ error: "Post not found" });
+    
+    if (result.alreadyLiked) {
+      return res.status(400).json({ error: "You have already liked this post" });
+    }
+    
+    res.json(result.post);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -13,9 +19,25 @@ exports.like = async (req, res) => {
 
 exports.unlike = async (req, res) => {
   try {
-    const post = await postService.unlikePost(req.params.id);
-    if (!post) return res.status(404).json({ error: "Post not found" });
-    res.json(post);
+    const userUid = req.user.uid; // Get user UID from Firebase auth middleware
+    const result = await postService.unlikePost(req.params.id, userUid);
+    if (!result.post) return res.status(404).json({ error: "Post not found" });
+    
+    if (result.notLiked) {
+      return res.status(400).json({ error: "You haven't liked this post yet" });
+    }
+    
+    res.json(result.post);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.checkLikeStatus = async (req, res) => {
+  try {
+    const userUid = req.user.uid;
+    const hasLiked = await postService.hasUserLikedPost(req.params.id, userUid);
+    res.json({ hasLiked });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
