@@ -3,11 +3,11 @@ const router = express.Router();
 const ReportController = require('../controllers/report.controller');
 const { verifyFirebaseToken } = require('../middlewares/auth.middleware');
 
-// All report routes require authentication
-router.use(verifyFirebaseToken);
-
-// GET /api/reports/types - Get available report types
+// GET /api/reports/types - Get available report types (PUBLIC)
 router.get('/types', ReportController.getTypes);
+
+// All other report routes require authentication
+router.use(verifyFirebaseToken);
 
 // GET /api/reports/overview - Get quick overview stats
 router.get('/overview', ReportController.getOverview);
