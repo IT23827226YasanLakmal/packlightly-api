@@ -8,6 +8,7 @@ const tripRoutes = require('./routes/trip.routes');
 const packinglistRoutes = require('./routes/packinglist.routes');
 const productRoutes = require('./routes/product.routes');
 const postRoutes = require('./routes/post.routes');
+const reportRoutes = require('./routes/report.routes');
 
 const newsRoutes = require('./routes/news.routes');
 const userRoutes = require('./routes/user.routes');
@@ -60,6 +61,7 @@ app.use('/api/trips', tripRoutes);
 app.use('/api/packinglists', packinglistRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
