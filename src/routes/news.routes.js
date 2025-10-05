@@ -1,11 +1,22 @@
-const router = require('express').Router();
-const ctrl = require('../controllers/news.controller');
-const { verifyFirebaseToken, requireRole } = require('../middlewares/auth.middleware');
+const express = require("express");
+const { NewsController } = require("../controllers/news.controller");
 
-router.get('/', ctrl.list);
-router.post('/', verifyFirebaseToken, requireRole('admin'), ctrl.create);
-router.get('/:id', ctrl.get);
-router.put('/:id', verifyFirebaseToken, requireRole('admin'), ctrl.update);
-router.delete('/:id', verifyFirebaseToken, requireRole('admin'), ctrl.remove);
+const router = express.Router();
+const newsController = new NewsController();
+
+// Create news
+router.post("/", newsController.create.bind(newsController));
+
+// Fetch from NewsData.io and save to DB
+router.get("/fetch", newsController.fetchAndSave.bind(newsController));
+
+// Get all news from DB
+router.get("/", newsController.getAll.bind(newsController));
+
+// Update news by ID
+router.put("/:id", newsController.update.bind(newsController));
+
+// Delete news by ID
+router.delete("/:id", newsController.delete.bind(newsController));
 
 module.exports = router;

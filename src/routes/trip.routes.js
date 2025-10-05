@@ -6,6 +6,7 @@ router.get('/', verifyFirebaseToken, ctrl.list);
 router.post('/', verifyFirebaseToken, ctrl.create);
 router.get('/:id', verifyFirebaseToken, ctrl.get);
 router.put('/:id', verifyFirebaseToken, ctrl.update);
+router.patch('/:id', verifyFirebaseToken, ctrl.update);
 router.delete('/:id', verifyFirebaseToken, ctrl.remove);
 
 module.exports = router;

@@ -1,6 +1,7 @@
-import admin from "../config/firebase.js";
+const admin = require("../config/firebase.js");
+const UserService = require("../services/user.service");
 
-const authenticateFirebase = async (req, res, next) => {
+const verifyFirebaseToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -11,7 +12,16 @@ const authenticateFirebase = async (req, res, next) => {
     const idToken = authHeader.split('Bearer ')[1];
     const decodedToken = await admin.auth().verifyIdToken(idToken);
 
-    req.user = decodedToken; // Attach decoded user info to request
+    // Fetch user profile from Firestore to get role information
+    const userProfile = await UserService.getFirestoreUserProfile(decodedToken.uid);
+    
+    // Merge Firebase token data with Firestore profile data
+    req.user = {
+      ...decodedToken,
+      role: userProfile && userProfile.role ? userProfile.role : 'user', // Default to 'user' if no role set
+      ...userProfile
+    };
+    
     next();
   } catch (error) {
     console.error('Firebase token verification failed:', error);
@@ -19,4 +29,17 @@ const authenticateFirebase = async (req, res, next) => {
   }
 };
 
-module.exports = authenticateFirebase;
+module.exports = { verifyFirebaseToken };
+
+
+const requireRole = (role) => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.role || req.user.role !== role) {
+      return res.status(403).json({ message: 'Forbidden: Insufficient role' });
+    }
+    next();
+  };
+};
+
+module.exports.requireRole = requireRole;
+

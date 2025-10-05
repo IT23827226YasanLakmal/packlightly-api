@@ -1,11 +1,22 @@
-const router = require('express').Router();
-const ctrl = require('../controllers/post.controller');
-const { verifyFirebaseToken } = require('../middlewares/auth.middleware');
+const router = require("express").Router();
+const postController = require("../controllers/post.controller");
+const { verifyFirebaseToken } = require("../middlewares/auth.middleware");
+const upload = require("../middlewares/upload");
 
-router.get('/', ctrl.list); // public
-router.post('/', verifyFirebaseToken, ctrl.create);
-router.get('/:id', ctrl.get);
-router.put('/:id', verifyFirebaseToken, ctrl.update);
-router.delete('/:id', verifyFirebaseToken, ctrl.remove);
+// Like/unlike
+router.post("/:id/like", verifyFirebaseToken, postController.like);
+router.post("/:id/unlike", verifyFirebaseToken, postController.unlike);
+router.get("/:id/like-status", verifyFirebaseToken, postController.checkLikeStatus);
+
+// CRUD
+router.get("/", postController.list); // Public route - anyone can view posts
+router.get("/my", verifyFirebaseToken, postController.getMyPosts); // Get user's own posts
+router.get("/:id", postController.getById); // Public route - anyone can view a post
+router.post("/", verifyFirebaseToken, upload.single("image"), postController.create);
+router.put("/:id", verifyFirebaseToken, upload.single("image"), postController.update);
+router.delete("/:id", verifyFirebaseToken, postController.delete);
+
+// Add comment
+router.post("/:id/comments", postController.addComment);
 
 module.exports = router;
