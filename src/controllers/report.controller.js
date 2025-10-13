@@ -282,10 +282,10 @@ class ReportController {
     try {
       const { id, format } = req.params;
       
-      if (!['json', 'csv'].includes(format)) {
+      if (!['json', 'csv', 'pdf', 'excel'].includes(format)) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid format. Supported formats: json, csv'
+          message: 'Invalid format. Supported formats: json, csv, pdf, excel'
         });
       }
 
@@ -305,18 +305,398 @@ class ReportController {
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
         res.json(report);
       } else if (format === 'csv') {
-        // Basic CSV export (can be enhanced based on report type)
-        let csvContent = 'Report Type,Generated At,Total Items\n';
-        csvContent += `${report.type},${report.generatedAt.toISOString()},${JSON.stringify(report.data.summary)}\n`;
-        
+        const csvContent = ReportController.generateCSV(report);
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
         res.send(csvContent);
+      } else if (format === 'pdf') {
+        const pdfBuffer = await ReportController.generatePDF(report);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
+        res.send(pdfBuffer);
+      } else if (format === 'excel') {
+        const excelBuffer = await ReportController.generateExcel(report);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+        res.send(excelBuffer);
       }
     } catch (error) {
       console.error('Export report error:', error);
       next(error);
     }
+  }
+
+  // Helper method to generate enhanced CSV
+  static generateCSV(report) {
+    let csvContent = '';
+    
+    // Header information
+    csvContent += 'Report Information\n';
+    csvContent += `Title,${report.title}\n`;
+    csvContent += `Type,${report.type}\n`;
+    csvContent += `Generated At,${report.generatedAt.toISOString()}\n`;
+    csvContent += `Status,${report.status}\n\n`;
+    
+    // Summary data
+    csvContent += 'Summary Metrics\n';
+    csvContent += 'Metric,Value\n';
+    
+    if (report.data && report.data.summary) {
+      Object.entries(report.data.summary).forEach(([key, value]) => {
+        csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${value}\n`;
+      });
+    }
+    
+    csvContent += '\n';
+    
+    // Chart data
+    if (report.data && report.data.charts) {
+      report.data.charts.forEach((chart, index) => {
+        csvContent += `Chart ${index + 1}: ${chart.title}\n`;
+        csvContent += 'Label,Value\n';
+        
+        if (chart.labels && chart.data) {
+          chart.labels.forEach((label, i) => {
+            csvContent += `${label},${chart.data[i] || 0}\n`;
+          });
+        }
+        
+        csvContent += '\n';
+      });
+    }
+    
+    return csvContent;
+  }
+
+  // Helper method to generate PDF
+  static async generatePDF(report) {
+    const puppeteer = require('puppeteer');
+    
+    const htmlContent = ReportController.generateHTMLTemplate(report);
+    
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20mm',
+        right: '20mm',
+        bottom: '20mm',
+        left: '20mm'
+      }
+    });
+    
+    await browser.close();
+    return pdfBuffer;
+  }
+
+  // Helper method to generate Excel
+  static async generateExcel(report) {
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    
+    // Main report sheet
+    const worksheet = workbook.addWorksheet('Report Summary');
+    
+    // Title and header
+    worksheet.mergeCells('A1:D1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = report.title;
+    titleCell.font = { size: 16, bold: true };
+    titleCell.alignment = { horizontal: 'center' };
+    
+    // Report info
+    let row = 3;
+    worksheet.getCell(`A${row}`).value = 'Report Type:';
+    worksheet.getCell(`B${row}`).value = report.type;
+    row++;
+    
+    worksheet.getCell(`A${row}`).value = 'Generated At:';
+    worksheet.getCell(`B${row}`).value = report.generatedAt;
+    row++;
+    
+    worksheet.getCell(`A${row}`).value = 'Status:';
+    worksheet.getCell(`B${row}`).value = report.status;
+    row += 2;
+    
+    // Summary section
+    if (report.data && report.data.summary) {
+      worksheet.getCell(`A${row}`).value = 'Summary Metrics';
+      worksheet.getCell(`A${row}`).font = { bold: true };
+      row++;
+      
+      worksheet.getCell(`A${row}`).value = 'Metric';
+      worksheet.getCell(`B${row}`).value = 'Value';
+      worksheet.getRow(row).font = { bold: true };
+      row++;
+      
+      Object.entries(report.data.summary).forEach(([key, value]) => {
+        worksheet.getCell(`A${row}`).value = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        worksheet.getCell(`B${row}`).value = value;
+        row++;
+      });
+    }
+    
+    // Charts as separate sheets
+    if (report.data && report.data.charts) {
+      report.data.charts.forEach((chart, index) => {
+        const chartSheet = workbook.addWorksheet(`Chart ${index + 1}`);
+        
+        // Chart title
+        chartSheet.getCell('A1').value = chart.title;
+        chartSheet.getCell('A1').font = { size: 14, bold: true };
+        
+        // Chart data
+        chartSheet.getCell('A3').value = 'Label';
+        chartSheet.getCell('B3').value = 'Value';
+        chartSheet.getRow(3).font = { bold: true };
+        
+        if (chart.labels && chart.data) {
+          chart.labels.forEach((label, i) => {
+            chartSheet.getCell(`A${4 + i}`).value = label;
+            chartSheet.getCell(`B${4 + i}`).value = chart.data[i] || 0;
+          });
+        }
+        
+        // Auto-fit columns
+        chartSheet.columns.forEach(column => {
+          column.width = 20;
+        });
+      });
+    }
+    
+    // Auto-fit columns for main sheet
+    worksheet.columns.forEach(column => {
+      column.width = 25;
+    });
+    
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer;
+  }
+
+  // Helper method to generate HTML template for PDF
+  static generateHTMLTemplate(report) {
+    const formatValue = (value) => {
+      if (typeof value === 'number') {
+        return value.toLocaleString();
+      }
+      return value;
+    };
+
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>${report.title}</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                color: #333;
+            }
+            .header {
+                text-align: center;
+                border-bottom: 2px solid #007bff;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+            }
+            .title {
+                font-size: 24px;
+                font-weight: bold;
+                color: #007bff;
+                margin-bottom: 10px;
+            }
+            .meta-info {
+                font-size: 12px;
+                color: #666;
+                margin-bottom: 5px;
+            }
+            .section {
+                margin-bottom: 30px;
+            }
+            .section-title {
+                font-size: 18px;
+                font-weight: bold;
+                color: #007bff;
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 5px;
+                margin-bottom: 15px;
+            }
+            .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+            .metric-card {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 5px;
+                border-left: 4px solid #007bff;
+            }
+            .metric-label {
+                font-size: 12px;
+                color: #666;
+                text-transform: uppercase;
+                margin-bottom: 5px;
+            }
+            .metric-value {
+                font-size: 20px;
+                font-weight: bold;
+                color: #333;
+            }
+            .chart-section {
+                margin-bottom: 25px;
+                page-break-inside: avoid;
+            }
+            .chart-title {
+                font-size: 16px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #333;
+            }
+            .chart-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+            }
+            .chart-table th,
+            .chart-table td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            .chart-table th {
+                background-color: #f8f9fa;
+                font-weight: bold;
+            }
+            .chart-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+            .footer {
+                margin-top: 50px;
+                padding-top: 20px;
+                border-top: 1px solid #ddd;
+                text-align: center;
+                font-size: 12px;
+                color: #666;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="title">${report.title}</div>
+            <div class="meta-info">Report Type: ${report.type.replace(/_/g, ' ').toUpperCase()}</div>
+            <div class="meta-info">Generated: ${new Date(report.generatedAt).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })}</div>
+            <div class="meta-info">Status: ${report.status.toUpperCase()}</div>
+        </div>
+    `;
+
+    // Summary section
+    if (report.data && report.data.summary) {
+      html += `
+        <div class="section">
+            <div class="section-title">Summary Metrics</div>
+            <div class="summary-grid">
+      `;
+      
+      Object.entries(report.data.summary).forEach(([key, value]) => {
+        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        html += `
+          <div class="metric-card">
+              <div class="metric-label">${label}</div>
+              <div class="metric-value">${formatValue(value)}</div>
+          </div>
+        `;
+      });
+      
+      html += `
+            </div>
+        </div>
+      `;
+    }
+
+    // Charts section
+    if (report.data && report.data.charts && report.data.charts.length > 0) {
+      html += `
+        <div class="section">
+            <div class="section-title">Charts & Analytics</div>
+      `;
+      
+      report.data.charts.forEach((chart, index) => {
+        html += `
+          <div class="chart-section">
+              <div class="chart-title">${chart.title}</div>
+              <table class="chart-table">
+                  <thead>
+                      <tr>
+                          <th>Label</th>
+                          <th>Value</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+        `;
+        
+        if (chart.labels && chart.data) {
+          chart.labels.forEach((label, i) => {
+            html += `
+              <tr>
+                  <td>${label}</td>
+                  <td>${formatValue(chart.data[i] || 0)}</td>
+              </tr>
+            `;
+          });
+        }
+        
+        html += `
+                  </tbody>
+              </table>
+          </div>
+        `;
+      });
+      
+      html += `
+        </div>
+      `;
+    }
+
+    // Additional details
+    if (report.data && report.data.details) {
+      html += `
+        <div class="section">
+            <div class="section-title">Additional Details</div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <pre style="white-space: pre-wrap; font-family: inherit;">${JSON.stringify(report.data.details, null, 2)}</pre>
+            </div>
+        </div>
+      `;
+    }
+
+    html += `
+        <div class="footer">
+            <p>Generated by PackLightly Analytics System</p>
+            <p>Report ID: ${report._id}</p>
+        </div>
+    </body>
+    </html>
+    `;
+
+    return html;
   }
 }
 
