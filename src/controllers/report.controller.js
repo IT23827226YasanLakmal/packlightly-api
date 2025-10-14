@@ -104,13 +104,20 @@ class ReportController {
 
       // Generate report asynchronously
       try {
-        const report = await ReportService.generateReport(type, req.user.uid, filters);
+        const reportData = await ReportService.generateReport(type, req.user.uid, filters);
         
-        // If a custom title was provided, update it
-        if (title && title.trim()) {
-          // Find and update the report in the database
-          await ReportService.updateReportTitle(report._id, title.trim());
+        // Remove _id field if it exists to prevent duplicate key error
+        if (reportData._id) {
+          delete reportData._id;
         }
+        
+        // If a custom title was provided, set it in the report data
+        if (title && title.trim()) {
+          reportData.title = title.trim();
+        }
+        
+        // Create the report in the database
+        const report = await ReportService.create(reportData);
         
         console.log(`Report generated successfully: ${report._id}`);
       } catch (generateError) {
@@ -158,13 +165,20 @@ class ReportController {
       }
 
       // Generate report synchronously
-      const report = await ReportService.generateReport(type, req.user.uid, filters);
+      const reportData = await ReportService.generateReport(type, req.user.uid, filters);
       
-      // Update title if provided
-      if (title && title.trim()) {
-        await ReportService.updateReportTitle(report._id, title.trim());
-        report.title = title.trim(); // Update the returned object as well
+      // Remove _id field if it exists to prevent duplicate key error
+      if (reportData._id) {
+        delete reportData._id;
       }
+      
+      // Set title if provided
+      if (title && title.trim()) {
+        reportData.title = title.trim();
+      }
+      
+      // Create the report in the database
+      const report = await ReportService.create(reportData);
       
       res.status(201).json({
         success: true,
@@ -253,19 +267,35 @@ class ReportController {
         });
       }
 
+      // Store the existing report's title and other properties
+      const existingTitle = existingReport.title;
+      const existingType = existingReport.type;
+      const existingFilters = existingReport.filters;
+
       // Delete the old report
       await ReportService.remove(id);
 
       // Generate new report with same parameters
-      const newReport = await ReportService.generateReport(
-        existingReport.type,
+      // Note: ReportService.generateReport returns a plain object, not a Mongoose model
+      const reportData = await ReportService.generateReport(
+        existingType,
         req.user.uid,
-        existingReport.filters
+        existingFilters
       );
 
-      // Keep the same title
-      newReport.title = existingReport.title;
-      await newReport.save();
+      // Remove _id field if it exists to prevent duplicate key error
+      if (reportData._id) {
+        delete reportData._id;
+      }
+
+      // Create a new report in the database with the generated data and preserved title
+      const newReportData = {
+        ...reportData,
+        title: existingTitle // Keep the same title
+      };
+
+      // Create the report using ReportService.create which returns a Mongoose model
+      const newReport = await ReportService.create(newReportData);
       
       res.json({
         success: true,
