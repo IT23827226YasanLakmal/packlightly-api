@@ -4,8 +4,116 @@ const PackingList = require('../models/PackingList');
 const Post = require('../models/Post');
 const Product = require('../models/Product');
 const News = require('../models/News');
+const reportFieldsConfig = require('../config/reportFieldsConfig');
 
 class ReportService {
+  /**
+   * Customize report data based on field configuration
+   * @param {Object} reportData - Raw report data
+   * @param {string} type - Report type
+   * @param {boolean} includeOptionals - Whether to include optional fields
+   * @param {Array} specificFields - Specific fields to include (overrides includeOptionals)
+   * @returns {Object} - Customized report data
+   */
+  static customizeReport(reportData, type, includeOptionals = true, specificFields = null) {
+    const config = reportFieldsConfig[type];
+    if (!config) {
+      console.warn(`No field configuration found for report type: ${type}`);
+      return reportData;
+    }
+
+    // Deep clone to avoid modifying original data
+    const customized = JSON.parse(JSON.stringify(reportData));
+    const { mandatory, optional } = config;
+
+    // Determine allowed fields
+    let allowedFields;
+    if (specificFields && Array.isArray(specificFields)) {
+      // Use specific fields if provided
+      allowedFields = [...mandatory, ...specificFields.filter(field => optional.includes(field))];
+    } else {
+      // Use includeOptionals flag
+      allowedFields = includeOptionals ? [...mandatory, ...optional] : mandatory;
+    }
+
+    // Clean the data object recursively
+    function cleanObject(obj, path = '') {
+      if (!obj || typeof obj !== 'object') return;
+      
+      Object.keys(obj).forEach(key => {
+        const fullPath = path ? `${path}.${key}` : key;
+        
+        // Check if this field path is allowed
+        const isAllowed = allowedFields.some(allowedField => {
+          // Allow if the current path matches exactly or is a parent/child of an allowed field
+          return allowedField === fullPath || 
+                 allowedField.startsWith(fullPath + '.') || 
+                 fullPath.startsWith(allowedField + '.');
+        });
+        
+        if (!isAllowed) {
+          delete obj[key];
+        } else if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+          // Recursively clean nested objects
+          cleanObject(obj[key], fullPath);
+          
+          // Remove empty objects after cleaning
+          if (Object.keys(obj[key]).length === 0) {
+            delete obj[key];
+          }
+        }
+      });
+    }
+
+    // Apply field filtering to the data section
+    if (customized.data) {
+      cleanObject(customized.data);
+    }
+
+    return customized;
+  }
+
+  /**
+   * Get available report types with their configurations
+   * @returns {Object} - Report types with field information
+   */
+  static getReportFieldsConfig() {
+    return Object.keys(reportFieldsConfig).reduce((acc, type) => {
+      const config = reportFieldsConfig[type];
+      acc[type] = {
+        mandatoryFields: config.mandatory,
+        optionalFields: config.optional,
+        totalFields: config.mandatory.length + config.optional.length
+      };
+      return acc;
+    }, {});
+  }
+
+  /**
+   * Validate if a report type supports specific fields
+   * @param {string} type - Report type
+   * @param {Array} fields - Fields to validate
+   * @returns {Object} - Validation result
+   */
+  static validateReportFields(type, fields) {
+    const config = reportFieldsConfig[type];
+    if (!config) {
+      return { valid: false, error: `Unknown report type: ${type}` };
+    }
+
+    const { mandatory, optional } = config;
+    const allValidFields = [...mandatory, ...optional];
+    const invalidFields = fields.filter(field => !allValidFields.includes(field));
+    const missingMandatory = mandatory.filter(field => !fields.includes(field));
+
+    return {
+      valid: invalidFields.length === 0 && missingMandatory.length === 0,
+      invalidFields,
+      missingMandatory,
+      validFields: fields.filter(field => allValidFields.includes(field))
+    };
+  }
+
   // Create a new report
   static async create(reportData) {
     return Report.create(reportData);
@@ -1169,31 +1277,113 @@ class ReportService {
 
   // Main method to generate any type of report
   static async generateReport(type, ownerUid, filters = {}) {
+    // Extract customization options from filters
+    const { 
+      includeOptionalFields = true, 
+      specificFields = null,
+      lightweight = false,
+      ...reportFilters 
+    } = filters;
+
+    // Generate the base report
+    let report;
     switch (type) {
       case 'trip_analytics':
-        return this.generateTripAnalytics(ownerUid, filters);
+        report = await this.generateTripAnalytics(ownerUid, reportFilters);
+        break;
       case 'packing_statistics':
-        return this.generatePackingStatistics(ownerUid, filters);
+        report = await this.generatePackingStatistics(ownerUid, reportFilters);
+        break;
       case 'eco_impact':
-        return this.generateEcoImpact(ownerUid, filters);
+        report = await this.generateEcoImpact(ownerUid, reportFilters);
+        break;
       case 'user_activity':
-        return this.generateUserActivity(ownerUid, filters);
+        report = await this.generateUserActivity(ownerUid, reportFilters);
+        break;
       case 'budget_analysis':
-        return this.generateBudgetAnalysis(ownerUid, filters);
+        report = await this.generateBudgetAnalysis(ownerUid, reportFilters);
+        break;
       case 'destination_trends':
-        return this.generateDestinationTrends(ownerUid, filters);
+        report = await this.generateDestinationTrends(ownerUid, reportFilters);
+        break;
       case 'eco_inventory':
-        return this.generateEcoInventory(ownerUid, filters);
+        report = await this.generateEcoInventory(ownerUid, reportFilters);
+        break;
       case 'news_section':
-        return this.generateNewsSection(ownerUid, filters);
+      case 'news_insights':
+        report = await this.generateNewsSection(ownerUid, reportFilters);
+        break;
       default:
         throw new Error(`Unknown report type: ${type}`);
     }
+
+    // Apply customization based on filters
+    const includeOptionals = lightweight ? false : includeOptionalFields;
+    const customizedReport = this.customizeReport(report, type, includeOptionals, specificFields);
+
+    return customizedReport;
   }
 
   // Get available report types
   static getReportTypes() {
-    return Report.getReportTypes();
+    const modelTypes = Report.getReportTypes();
+    const configTypes = this.getReportFieldsConfig();
+    
+    // Merge model types with field configurations, maintaining backward compatibility
+    return modelTypes.map(modelType => ({
+      value: modelType.value,           // Keep original 'value' property for backend compatibility
+      label: modelType.label,           // Keep original 'label' property for frontend
+      description: modelType.description, // Keep original description
+      type: modelType.value,            // Add 'type' alias for consistency
+      name: modelType.label,            // Add 'name' alias for consistency
+      mandatoryFields: configTypes[modelType.value]?.mandatoryFields?.length || 0,
+      optionalFields: configTypes[modelType.value]?.optionalFields?.length || 0,
+      totalFields: configTypes[modelType.value]?.totalFields || 0,
+      supportsCustomization: true,
+      fieldConfig: configTypes[modelType.value] || null
+    }));
+  }
+
+  /**
+   * Get human-readable name for report type
+   * @param {string} type - Report type
+   * @returns {string} - Human-readable name
+   */
+  static getReportTypeName(type) {
+    const nameMap = {
+      trip_analytics: 'Trip Analytics',
+      packing_statistics: 'Packing Statistics',
+      eco_inventory: 'Eco Inventory',
+      news_insights: 'News Insights',
+      community_analytics: 'Community Analytics',
+      user_activity: 'User Activity',
+      budget_analysis: 'Budget Analysis',
+      destination_trends: 'Destination Trends',
+      eco_impact: 'Eco Impact',
+      news_section: 'News Section'
+    };
+    return nameMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  /**
+   * Get description for report type
+   * @param {string} type - Report type
+   * @returns {string} - Report description
+   */
+  static getReportTypeDescription(type) {
+    const descriptionMap = {
+      trip_analytics: 'Comprehensive analysis of travel patterns, destinations, and eco-friendly metrics',
+      packing_statistics: 'Detailed statistics on packing list completion rates and item usage',
+      eco_inventory: 'Analysis of eco-friendly products and sustainability trends',
+      news_insights: 'Insights from travel news sources and trending topics',
+      community_analytics: 'Community engagement and post activity analysis',
+      user_activity: 'User behavior patterns and engagement metrics',
+      budget_analysis: 'Travel budget breakdowns and spending patterns',
+      destination_trends: 'Popular destinations and travel trend analysis',
+      eco_impact: 'Environmental impact and sustainability scoring',
+      news_section: 'Travel news aggregation and content analysis'
+    };
+    return descriptionMap[type] || `Analytics report for ${this.getReportTypeName(type)}`;
   }
 }
 
