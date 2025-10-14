@@ -186,17 +186,17 @@ class ReportController {
     }
   }
 
-  // DELETE /api/reports/:id - Delete a report
+  // DELETE /api/reports/:id - Delete a report (accessible to all users)
   static async remove(req, res, next) {
     try {
       const { id } = req.params;
       
-      const deleted = await ReportService.remove(id, req.user.uid);
+      const deleted = await ReportService.remove(id);
       
       if (!deleted) {
         return res.status(404).json({
           success: false,
-          message: 'Report not found or you do not have permission to delete it'
+          message: 'Report not found'
         });
       }
       
@@ -254,7 +254,7 @@ class ReportController {
       }
 
       // Delete the old report
-      await ReportService.remove(id, req.user.uid);
+      await ReportService.remove(id);
 
       // Generate new report with same parameters
       const newReport = await ReportService.generateReport(

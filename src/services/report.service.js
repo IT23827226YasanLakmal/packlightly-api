@@ -140,9 +140,9 @@ class ReportService {
     return Report.findOne({ _id: id, ownerUid });
   }
 
-  // Delete a report
-  static async remove(id, ownerUid) {
-    return Report.findOneAndDelete({ _id: id, ownerUid });
+  // Delete a report (accessible to all users)
+  static async remove(id) {
+    return Report.findByIdAndDelete(id);
   }
 
   // Update report title
