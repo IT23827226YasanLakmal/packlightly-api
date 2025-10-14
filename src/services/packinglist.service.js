@@ -126,8 +126,8 @@ async function addAISuggestions(id, ownerUid) {
     throw new Error('Trip not found');
   }
 
-  // Generate AI suggestions
-  const aiSuggestions = await ollamaService.generatePackingSuggestion(trip);
+  // Generate AI suggestions with existing list context
+  const aiSuggestions = await ollamaService.generatePackingSuggestion(trip, packingList);
 
   // Merge AI suggestions with existing list
   aiSuggestions.categories.forEach(aiCategory => {
@@ -258,8 +258,8 @@ async function generateAISuggestion(packingListId, ownerUid) {
       throw new Error('Trip not found');
     }
 
-    // Generate AI suggestions using ollamaService
-    const aiSuggestions = await ollamaService.generatePackingSuggestion(trip);
+    // Generate AI suggestions using ollamaService with existing list context
+    const aiSuggestions = await ollamaService.generatePackingSuggestion(trip, packingList);
 
     // Return the raw AI suggestions without creating a packing list
     return {
