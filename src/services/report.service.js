@@ -505,6 +505,147 @@ class ReportService {
     return this.create(reportData);
   }
 
+  // Generate Destination Trends Report
+  static async generateDestinationTrends(ownerUid, filters = {}) {
+    // Get all trips (for user-specific trends) or all trips (for global trends)
+    const query = ownerUid ? { ownerUid } : {};
+    
+    // Apply date filters
+    if (filters.dateRange?.startDate || filters.dateRange?.endDate) {
+      query.startDate = {};
+      if (filters.dateRange.startDate) {
+        query.startDate.$gte = new Date(filters.dateRange.startDate);
+      }
+      if (filters.dateRange.endDate) {
+        query.startDate.$lte = new Date(filters.dateRange.endDate);
+      }
+    }
+
+    const trips = await Trip.find(query).sort({ startDate: -1 });
+
+    // Destination popularity
+    const destinationCounts = {};
+    const destinationBudgets = {};
+    const destinationsByMonth = {};
+    
+    trips.forEach(trip => {
+      if (trip.destination) {
+        // Count visits
+        destinationCounts[trip.destination] = (destinationCounts[trip.destination] || 0) + 1;
+        
+        // Track budgets for average calculation
+        if (trip.budget) {
+          if (!destinationBudgets[trip.destination]) {
+            destinationBudgets[trip.destination] = { total: 0, count: 0 };
+          }
+          destinationBudgets[trip.destination].total += trip.budget;
+          destinationBudgets[trip.destination].count += 1;
+        }
+        
+        // Track monthly trends
+        if (trip.startDate) {
+          const month = trip.startDate.toISOString().slice(0, 7);
+          if (!destinationsByMonth[month]) {
+            destinationsByMonth[month] = {};
+          }
+          destinationsByMonth[month][trip.destination] = 
+            (destinationsByMonth[month][trip.destination] || 0) + 1;
+        }
+      }
+    });
+
+    // Sort destinations by popularity
+    const popularDestinations = Object.entries(destinationCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([destination, count]) => ({
+        destination,
+        visits: count,
+        avgBudget: destinationBudgets[destination] ? 
+          Math.round(destinationBudgets[destination].total / destinationBudgets[destination].count) : 0
+      }));
+
+    // Find trending destinations (destinations with increasing visits over time)
+    const recentMonths = Object.keys(destinationsByMonth).sort().slice(-6); // Last 6 months
+    const trendingDestinations = {};
+    
+    recentMonths.forEach((month, index) => {
+      const monthDestinations = destinationsByMonth[month] || {};
+      Object.entries(monthDestinations).forEach(([destination, count]) => {
+        if (!trendingDestinations[destination]) {
+          trendingDestinations[destination] = [];
+        }
+        trendingDestinations[destination].push({ month, count, index });
+      });
+    });
+
+    // Calculate trend scores (simple increase over time)
+    const trendingScores = {};
+    Object.entries(trendingDestinations).forEach(([destination, data]) => {
+      if (data.length >= 2) {
+        const firstCount = data[0].count;
+        const lastCount = data[data.length - 1].count;
+        trendingScores[destination] = lastCount - firstCount;
+      }
+    });
+
+    const topTrending = Object.entries(trendingScores)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([destination, score]) => ({ destination, trendScore: score }));
+
+    const reportData = {
+      ownerUid,
+      title: ownerUid ? 'My Destination Trends' : 'Global Destination Trends',
+      type: 'destination_trends',
+      filters,
+      data: {
+        summary: {
+          totalTrips: trips.length,
+          uniqueDestinations: Object.keys(destinationCounts).length,
+          favoriteDestination: popularDestinations[0]?.destination || 'None',
+          avgStayDuration: trips.length > 0 ? 
+            Math.round(trips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / trips.length) : 0,
+          returnVisits: Object.values(destinationCounts).filter(count => count > 1).length
+        },
+        charts: [
+          {
+            type: 'bar',
+            title: 'Most Popular Destinations',
+            data: popularDestinations.map(d => d.visits),
+            labels: popularDestinations.map(d => d.destination)
+          },
+          {
+            type: 'doughnut',
+            title: 'Destination Distribution',
+            data: popularDestinations.slice(0, 5).map(d => d.visits),
+            labels: popularDestinations.slice(0, 5).map(d => d.destination)
+          },
+          {
+            type: 'bar',
+            title: 'Average Budget by Destination',
+            data: popularDestinations.map(d => d.avgBudget),
+            labels: popularDestinations.map(d => d.destination)
+          }
+        ],
+        details: {
+          popularDestinations,
+          trendingDestinations: topTrending,
+          monthlyTrends: destinationsByMonth,
+          destinationStats: Object.entries(destinationCounts).map(([destination, visits]) => ({
+            destination,
+            visits,
+            avgBudget: destinationBudgets[destination] ? 
+              Math.round(destinationBudgets[destination].total / destinationBudgets[destination].count) : 0,
+            totalBudget: destinationBudgets[destination]?.total || 0
+          }))
+        }
+      }
+    };
+
+    return this.create(reportData);
+  }
+
   // Main method to generate any type of report
   static async generateReport(type, ownerUid, filters = {}) {
     switch (type) {
@@ -518,6 +659,8 @@ class ReportService {
         return this.generateUserActivity(ownerUid, filters);
       case 'budget_analysis':
         return this.generateBudgetAnalysis(ownerUid, filters);
+      case 'destination_trends':
+        return this.generateDestinationTrends(ownerUid, filters);
       default:
         throw new Error(`Unknown report type: ${type}`);
     }
