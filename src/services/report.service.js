@@ -119,9 +119,9 @@ class ReportService {
     return Report.create(reportData);
   }
 
-  // List reports for a user
-  static async list(ownerUid, filters = {}) {
-    const query = { ownerUid };
+  // List all reports (accessible to all users)
+  static async list(filters = {}) {
+    const query = {};
     
     if (filters.type) query.type = filters.type;
     if (filters.fromDate) query.generatedAt = { $gte: new Date(filters.fromDate) };
