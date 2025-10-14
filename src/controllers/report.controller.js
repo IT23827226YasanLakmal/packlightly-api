@@ -537,10 +537,21 @@ class ReportController {
     // Add object data as separate sections
     Object.entries(objectData).forEach(([title, data]) => {
       csvContent += `${title} - Detailed Breakdown\n`;
-      csvContent += 'Category,Value\n';
-      Object.entries(data).forEach(([key, value]) => {
-        csvContent += `${key},${value}\n`;
-      });
+      
+      // Special handling for ecoProductAvailability - show only unique locations
+      if (title.toLowerCase().includes('eco product availability')) {
+        csvContent += 'Location\n';
+        const uniqueLocations = [...new Set(Object.keys(data))];
+        uniqueLocations.forEach(location => {
+          csvContent += `${location}\n`;
+        });
+      } else {
+        // Default handling for other object data
+        csvContent += 'Category,Value\n';
+        Object.entries(data).forEach(([key, value]) => {
+          csvContent += `${key},${value}\n`;
+        });
+      }
       csvContent += '\n';
     });
     
@@ -662,18 +673,34 @@ class ReportController {
         objectSheet.getCell('A1').value = title;
         objectSheet.getCell('A1').font = { size: 14, bold: true };
         
-        // Headers
-        objectSheet.getCell('A3').value = 'Category';
-        objectSheet.getCell('B3').value = 'Value';
-        objectSheet.getRow(3).font = { bold: true };
-        
-        // Data
-        let dataRow = 4;
-        Object.entries(data).forEach(([key, value]) => {
-          objectSheet.getCell(`A${dataRow}`).value = key;
-          objectSheet.getCell(`B${dataRow}`).value = value;
-          dataRow++;
-        });
+        // Special handling for ecoProductAvailability - show only unique locations
+        if (title.toLowerCase().includes('eco product availability')) {
+          // Headers
+          objectSheet.getCell('A3').value = 'Location';
+          objectSheet.getRow(3).font = { bold: true };
+          
+          // Data - unique locations only
+          const uniqueLocations = [...new Set(Object.keys(data))];
+          let dataRow = 4;
+          uniqueLocations.forEach(location => {
+            objectSheet.getCell(`A${dataRow}`).value = location;
+            dataRow++;
+          });
+        } else {
+          // Default handling for other object data
+          // Headers
+          objectSheet.getCell('A3').value = 'Category';
+          objectSheet.getCell('B3').value = 'Value';
+          objectSheet.getRow(3).font = { bold: true };
+          
+          // Data
+          let dataRow = 4;
+          Object.entries(data).forEach(([key, value]) => {
+            objectSheet.getCell(`A${dataRow}`).value = key;
+            objectSheet.getCell(`B${dataRow}`).value = value;
+            dataRow++;
+          });
+        }
         
         // Auto-fit columns
         objectSheet.columns.forEach(column => {
@@ -736,6 +763,31 @@ class ReportController {
       const entries = Object.entries(obj);
       if (entries.length === 0) return '';
       
+      // Special handling for ecoProductAvailability - show only unique locations
+      if (title.toLowerCase().includes('eco product availability')) {
+        const uniqueLocations = [...new Set(Object.keys(obj))];
+        return `
+          <div style="margin-top: 15px;">
+            <div style="font-weight: bold; margin-bottom: 10px; color: #007bff; font-size: 14px;">${title}</div>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 12px;">
+              <thead>
+                <tr style="background-color: #f8f9fa;">
+                  <th style="border: 1px solid #ddd; padding: 8px; text-align: left; font-weight: bold;">Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${uniqueLocations.map(location => `
+                  <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${location}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+      
+      // Default handling for other object data
       return `
         <div style="margin-top: 15px;">
           <div style="font-weight: bold; margin-bottom: 10px; color: #007bff; font-size: 14px;">${title}</div>
