@@ -513,20 +513,36 @@ class ReportController {
     
     // Handle both old structure (report.data.summary) and new structure (report.summary)
     const summaryData = report.summary || report.data?.summary;
+    const objectData = {};
+    
     if (summaryData) {
       Object.entries(summaryData).forEach(([key, value]) => {
+        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        
         // Handle arrays and objects differently
         if (Array.isArray(value)) {
-          csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${value.join('; ')}\n`;
+          csvContent += `${label},${value.join('; ')}\n`;
         } else if (typeof value === 'object' && value !== null) {
-          csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${JSON.stringify(value)}\n`;
+          // Store object data for separate table in CSV
+          objectData[label] = value;
+          csvContent += `${label},${Object.keys(value).length} categories (see detailed breakdown below)\n`;
         } else {
-          csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${value}\n`;
+          csvContent += `${label},${value}\n`;
         }
       });
     }
     
     csvContent += '\n';
+    
+    // Add object data as separate sections
+    Object.entries(objectData).forEach(([title, data]) => {
+      csvContent += `${title} - Detailed Breakdown\n`;
+      csvContent += 'Category,Value\n';
+      Object.entries(data).forEach(([key, value]) => {
+        csvContent += `${key},${value}\n`;
+      });
+      csvContent += '\n';
+    });
     
     // Chart data - handle both structures
     const chartData = report.charts || report.data?.charts;
@@ -618,18 +634,51 @@ class ReportController {
       worksheet.getRow(row).font = { bold: true };
       row++;
       
+      // Store object data for separate sheets
+      const objectData = {};
+      
       Object.entries(summaryData).forEach(([key, value]) => {
-        worksheet.getCell(`A${row}`).value = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        worksheet.getCell(`A${row}`).value = label;
         
         // Handle arrays and objects for Excel
         if (Array.isArray(value)) {
           worksheet.getCell(`B${row}`).value = value.join(', ');
         } else if (typeof value === 'object' && value !== null) {
-          worksheet.getCell(`B${row}`).value = JSON.stringify(value);
+          // Store object data for separate sheet
+          objectData[label] = value;
+          worksheet.getCell(`B${row}`).value = `${Object.keys(value).length} categories (see ${label} sheet)`;
         } else {
           worksheet.getCell(`B${row}`).value = value;
         }
         row++;
+      });
+      
+      // Create separate sheets for object data
+      Object.entries(objectData).forEach(([title, data]) => {
+        const objectSheet = workbook.addWorksheet(title.substring(0, 31)); // Excel sheet name limit
+        
+        // Sheet title
+        objectSheet.getCell('A1').value = title;
+        objectSheet.getCell('A1').font = { size: 14, bold: true };
+        
+        // Headers
+        objectSheet.getCell('A3').value = 'Category';
+        objectSheet.getCell('B3').value = 'Value';
+        objectSheet.getRow(3).font = { bold: true };
+        
+        // Data
+        let dataRow = 4;
+        Object.entries(data).forEach(([key, value]) => {
+          objectSheet.getCell(`A${dataRow}`).value = key;
+          objectSheet.getCell(`B${dataRow}`).value = value;
+          dataRow++;
+        });
+        
+        // Auto-fit columns
+        objectSheet.columns.forEach(column => {
+          column.width = 25;
+        });
       });
     }
     
@@ -678,6 +727,36 @@ class ReportController {
         return value.toLocaleString();
       }
       return value;
+    };
+
+    // Helper function to generate table for object data
+    const generateObjectTable = (obj, title) => {
+      if (!obj || typeof obj !== 'object') return '';
+      
+      const entries = Object.entries(obj);
+      if (entries.length === 0) return '';
+      
+      return `
+        <div style="margin-top: 15px;">
+          <div style="font-weight: bold; margin-bottom: 10px; color: #007bff; font-size: 14px;">${title}</div>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 12px;">
+            <thead>
+              <tr style="background-color: #f8f9fa;">
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left; font-weight: bold;">Category</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(([key, value]) => `
+                <tr>
+                  <td style="border: 1px solid #ddd; padding: 8px;">${key}</td>
+                  <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${formatValue(value)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
     };
 
     let html = `
@@ -858,6 +937,9 @@ class ReportController {
             <div class="summary-grid">
       `;
       
+      // Collect object data for separate table display
+      const objectData = {};
+      
       Object.entries(summaryData).forEach(([key, value]) => {
         const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
         let displayValue = formatValue(value);
@@ -866,7 +948,9 @@ class ReportController {
         if (Array.isArray(value)) {
           displayValue = value.slice(0, 3).join(', ') + (value.length > 3 ? '...' : '');
         } else if (typeof value === 'object' && value !== null) {
-          displayValue = 'See details below';
+          // Store object data for table display
+          objectData[label] = value;
+          displayValue = `${Object.keys(value).length} categories`;
         }
         
         html += `
@@ -879,6 +963,14 @@ class ReportController {
       
       html += `
             </div>
+      `;
+      
+      // Add object data as tables
+      Object.entries(objectData).forEach(([title, data]) => {
+        html += generateObjectTable(data, title);
+      });
+      
+      html += `
         </div>
       `;
     }
