@@ -150,11 +150,11 @@ class ReportService {
     return Report.findByIdAndUpdate(id, { title }, { new: true });
   }
 
-  // Generate Trip Analytics Report
+  // Generate Trip Analytics Report - Simplified Version
   static async generateTripAnalytics(ownerUid, filters = {}) {
     const query = { ownerUid };
     
-    // Apply date filters
+    // Apply basic filters
     if (filters.dateRange?.startDate || filters.dateRange?.endDate) {
       query.startDate = {};
       if (filters.dateRange.startDate) {
@@ -165,91 +165,24 @@ class ReportService {
       }
     }
 
-    // Apply trip type filter
     if (filters.tripType) {
       query.type = filters.tripType;
     }
 
-    // Apply destination filter
     if (filters.destination) {
       query.destination = new RegExp(filters.destination, 'i');
     }
 
-    // Apply budget filter
-    if (filters.budgetRange?.min || filters.budgetRange?.max) {
-      query.budget = {};
-      if (filters.budgetRange.min) query.budget.$gte = filters.budgetRange.min;
-      if (filters.budgetRange.max) query.budget.$lte = filters.budgetRange.max;
-    }
-
-    // Apply geographic regions filter
-    if (filters.geographicRegions && filters.geographicRegions.length > 0) {
-      const regionQueries = filters.geographicRegions.map(region => 
-        new RegExp(region, 'i')
-      );
-      query.destination = { $in: regionQueries };
-    }
-
-    // Apply sustainability levels filter
-    if (filters.sustainabilityLevels && filters.sustainabilityLevels.length > 0) {
-      const sustainabilityQuery = [];
-      filters.sustainabilityLevels.forEach(level => {
-        switch(level.toLowerCase()) {
-          case 'high':
-            sustainabilityQuery.push({ ecoScore: { $gte: 80 } });
-            break;
-          case 'medium':
-            sustainabilityQuery.push({ ecoScore: { $gte: 50, $lt: 80 } });
-            break;
-          case 'low':
-            sustainabilityQuery.push({ ecoScore: { $lt: 50 } });
-            break;
-          case 'eco-friendly':
-            sustainabilityQuery.push({ isEcoFriendly: true });
-            break;
-        }
-      });
-      if (sustainabilityQuery.length > 0) {
-        query.$or = sustainabilityQuery;
-      }
-    }
-
-    // Apply budget ranges filter (advanced)
-    if (filters.budgetRanges && filters.budgetRanges.length > 0) {
-      const budgetQuery = [];
-      filters.budgetRanges.forEach(range => {
-        switch(range) {
-          case 'budget':
-            budgetQuery.push({ budget: { $lt: 1000 } });
-            break;
-          case 'mid-range':
-            budgetQuery.push({ budget: { $gte: 1000, $lt: 5000 } });
-            break;
-          case 'luxury':
-            budgetQuery.push({ budget: { $gte: 5000 } });
-            break;
-          case 'backpacker':
-            budgetQuery.push({ budget: { $lt: 500 } });
-            break;
-        }
-      });
-      if (budgetQuery.length > 0) {
-        query.$or = query.$or ? { $and: [{ $or: query.$or }, { $or: budgetQuery }] } : budgetQuery;
-      }
-    }
-
     const trips = await Trip.find(query).sort({ startDate: -1 });
 
-    // Calculate comprehensive summary statistics
+    // Calculate only the essential metrics
     const totalTrips = trips.length;
     const totalBudget = trips.reduce((sum, trip) => sum + (trip.budget || 0), 0);
     const avgTripDuration = totalTrips > 0 ? 
-      trips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / totalTrips : 0;
+      Math.round(trips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / totalTrips) : 0;
 
-    // Metrics for better analytics
+    // Essential metrics only
     const uniqueDestinations = [...new Set(trips.map(trip => trip.destination).filter(Boolean))].length;
-    const ecoTrips = trips.filter(trip => trip.isEcoFriendly || trip.ecoScore >= 70);
-    const ecoFriendlyPercentage = totalTrips > 0 ? Math.round((ecoTrips.length / totalTrips) * 100) : 0;
     
     // Calculate favorite destination
     const destinationCounts = {};
@@ -259,39 +192,26 @@ class ReportService {
       }
     });
     const favoriteDestination = Object.entries(destinationCounts)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None';
+      .sort(([,a], [,b]) => b - a)[0]?.[0] || null;
 
-    // Calculate return visits (destinations visited more than once)
-    const returnVisits = Object.values(destinationCounts).filter(count => count > 1).length;
-
-    // Calculate carbon footprint (simple estimation)
-    const estimatedCarbonFootprint = trips.reduce((sum, trip) => {
-      // Estimate based on trip type and duration
-      const baseCO2 = trip.type === 'International' ? 2000 : 500; // kg CO2
-      const durationMultiplier = (trip.durationDays || 1) / 7; // per week
+    // Calculate carbon footprint (simplified)
+    const estimatedCarbonFootprint = Math.round(trips.reduce((sum, trip) => {
+      const baseCO2 = trip.type === 'International' ? 2000 : 500;
+      const durationMultiplier = (trip.durationDays || 1) / 7;
       return sum + (baseCO2 * durationMultiplier);
-    }, 0);
+    }, 0));
 
-    // Calculate carbon saved through eco choices
-    const carbonSaved = ecoTrips.reduce((sum, trip) => {
-      return sum + ((trip.carbonSaved || 0) + (trip.ecoScore || 0) * 2); // Estimate
-    }, 0);
+    // Budget calculations
+    const avgBudget = totalTrips > 0 ? Math.round(totalBudget / totalTrips) : 0;
+    const maxBudget = totalTrips > 0 ? Math.max(...trips.map(t => t.budget || 0)) : 0;
+    const minBudget = totalTrips > 0 ? Math.min(...trips.map(t => t.budget || 0)) : 0;
 
-    // Trip type distribution
+    // Generate essential charts only
     const tripTypeData = {};
     trips.forEach(trip => {
-      tripTypeData[trip.type] = (tripTypeData[trip.type] || 0) + 1;
+      tripTypeData[trip.type || 'Unknown'] = (tripTypeData[trip.type || 'Unknown'] || 0) + 1;
     });
 
-    // Destination trends
-    const destinationData = {};
-    trips.forEach(trip => {
-      if (trip.destination) {
-        destinationData[trip.destination] = (destinationData[trip.destination] || 0) + 1;
-      }
-    });
-
-    // Monthly trends (last 12 months)
     const monthlyData = {};
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     trips.forEach(trip => {
@@ -302,7 +222,6 @@ class ReportService {
       }
     });
 
-    // Budget analysis
     const budgetRanges = {
       '0-500': 0,
       '501-1000': 0,
@@ -320,79 +239,6 @@ class ReportService {
       else budgetRanges['5000+']++;
     });
 
-    // Top destinations with metrics
-    const topDestinations = Object.entries(destinationCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 10)
-      .map(([destination, count]) => {
-        const destTrips = trips.filter(trip => trip.destination === destination);
-        const avgDuration = destTrips.length > 0 ? 
-          destTrips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / destTrips.length : 0;
-        const avgEcoScore = destTrips.length > 0 ?
-          destTrips.reduce((sum, trip) => sum + (trip.ecoScore || 0), 0) / destTrips.length : 0;
-        
-        return {
-          name: destination,
-          trips: count,
-          avgDuration: Math.round(avgDuration * 10) / 10,
-          ecoScore: Math.round(avgEcoScore)
-        };
-      });
-
-    // Monthly breakdown with metrics
-    const monthlyBreakdown = Object.entries(monthlyData)
-      .map(([month, tripCount]) => {
-        const monthTrips = trips.filter(trip => {
-          if (!trip.startDate) return false;
-          const date = new Date(trip.startDate);
-          const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-          return monthKey === month;
-        });
-        
-        const avgDuration = monthTrips.length > 0 ?
-          monthTrips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / monthTrips.length : 0;
-        const carbonFootprint = monthTrips.reduce((sum, trip) => sum + (trip.carbonFootprint || 0), 0);
-        
-        return {
-          month,
-          trips: tripCount,
-          avgDuration: Math.round(avgDuration * 10) / 10,
-          carbonFootprint: Math.round(carbonFootprint)
-        };
-      })
-      .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
-
-    // Eco impact breakdown
-    const ecoImpactBreakdown = {
-      transportationSavings: trips.reduce((sum, trip) => sum + (trip.transportationSavings || 0), 0),
-      accommodationSavings: trips.reduce((sum, trip) => sum + (trip.accommodationSavings || 0), 0),
-      activitySavings: trips.reduce((sum, trip) => sum + (trip.activitySavings || 0), 0),
-      totalCarbonSaved: carbonSaved,
-      avgEcoScore: ecoTrips.length > 0 ? 
-        Math.round(ecoTrips.reduce((sum, trip) => sum + (trip.ecoScore || 0), 0) / ecoTrips.length) : 0
-    };
-
-    // Smart recommendations based on data
-    const recommendations = [];
-    const avgEcoScore = ecoTrips.length > 0 ? 
-      ecoTrips.reduce((sum, trip) => sum + (trip.ecoScore || 0), 0) / ecoTrips.length : 0;
-    
-    if (avgEcoScore < 70) {
-      recommendations.push("Consider eco-friendly accommodation options to improve your sustainability score");
-    }
-    if (ecoFriendlyPercentage > 70) {
-      recommendations.push(`Your ${favoriteDestination} trips show excellent eco-performance - continue this pattern`);
-    }
-    if (totalTrips > 5) {
-      recommendations.push("You're an active traveler! Consider offsetting your carbon footprint");
-    }
-    if (returnVisits > 0) {
-      recommendations.push("You have favorite destinations! Share your local insights with other travelers");
-    }
-    if (recommendations.length === 0) {
-      recommendations.push("Keep exploring and sharing your travel experiences!");
-    }
-
     const reportData = {
       ownerUid,
       title: 'Trip Analytics Report',
@@ -401,18 +247,15 @@ class ReportService {
       data: {
         summary: {
           totalTrips,
+          totalBudget: Math.round(totalBudget),
+          avgTripDuration,
+          avgBudget,
+          maxBudget,
+          minBudget,
+          estimatedCarbonFootprint,
           uniqueDestinations,
           favoriteDestination,
-          avgTripDuration: Math.round(avgTripDuration * 100) / 100,
-          avgStayDuration: Math.round(avgTripDuration * 100) / 100, // Same as avgTripDuration
-          ecoFriendlyPercentage,
-          returnVisits,
-          estimatedCarbonFootprint: Math.round(estimatedCarbonFootprint),
-          carbonSaved: Math.round(carbonSaved),
-          totalBudget: Math.round(totalBudget),
-          avgBudget: totalTrips > 0 ? Math.round(totalBudget / totalTrips) : 0,
-          maxBudget: totalTrips > 0 ? Math.max(...trips.map(t => t.budget || 0)) : 0,
-          minBudget: totalTrips > 0 ? Math.min(...trips.map(t => t.budget || 0)) : 0
+          avgStayDuration: avgTripDuration // Same as avgTripDuration
         },
         charts: [
           {
@@ -428,41 +271,18 @@ class ReportService {
             labels: Object.keys(tripTypeData)
           },
           {
-            type: 'line',
-            title: 'Eco Score Improvement',
-            data: ecoTrips.map(trip => trip.ecoScore || 0),
-            labels: ecoTrips.map((trip, index) => `Trip ${index + 1}`)
-          },
-          {
             type: 'doughnut',
             title: 'Budget Distribution',
             data: Object.values(budgetRanges),
             labels: Object.keys(budgetRanges)
+          },
+          {
+            type: 'bar',
+            title: 'Destinations Visited',
+            data: Object.values(destinationCounts),
+            labels: Object.keys(destinationCounts)
           }
-        ],
-        details: {
-          topDestinations,
-          monthlyBreakdown,
-          ecoImpactBreakdown,
-          recommendations,
-          recentTrips: trips.slice(0, 10).map(trip => ({
-            destination: trip.destination,
-            startDate: trip.startDate,
-            duration: trip.durationDays,
-            budget: trip.budget,
-            ecoScore: trip.ecoScore,
-            type: trip.type
-          })),
-          travelPatterns: {
-            mostActiveMonth: Object.entries(monthlyData).sort(([,a], [,b]) => b - a)[0]?.[0] || 'None',
-            avgTripsPerMonth: Object.keys(monthlyData).length > 0 ? 
-              Math.round(totalTrips / Object.keys(monthlyData).length * 10) / 10 : 0,
-            longestTrip: trips.reduce((longest, trip) => 
-              (trip.durationDays || 0) > (longest.durationDays || 0) ? trip : longest, {}),
-            shortestTrip: trips.reduce((shortest, trip) => 
-              (trip.durationDays || 999) < (shortest.durationDays || 999) ? trip : shortest, {})
-          }
-        }
+        ]
       }
     };
 

@@ -299,24 +299,26 @@ class ReportController {
         });
       }
 
+      // Format report based on type before export
+      const formattedReport = ReportController.formatReportForExport(report);
       const filename = `${report.title.replace(/\s+/g, '_')}_${report.generatedAt.toISOString().slice(0, 10)}`;
 
       if (format === 'json') {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
-        res.json(report);
+        res.json(formattedReport);
       } else if (format === 'csv') {
-        const csvContent = ReportController.generateCSV(report);
+        const csvContent = ReportController.generateCSV(formattedReport);
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
         res.send(csvContent);
       } else if (format === 'pdf') {
-        const pdfBuffer = await ReportController.generatePDF(report);
+        const pdfBuffer = await ReportController.generatePDF(formattedReport);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
         res.send(pdfBuffer);
       } else if (format === 'excel') {
-        const excelBuffer = await ReportController.generateExcel(report);
+        const excelBuffer = await ReportController.generateExcel(formattedReport);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
         res.send(excelBuffer);
@@ -325,6 +327,146 @@ class ReportController {
       console.error('Export report error:', error);
       next(error);
     }
+  }
+
+  // Helper method to format report for export based on type
+  static formatReportForExport(report) {
+    const baseInfo = {
+      _id: report._id,
+      title: report.title,
+      type: report.type,
+      generatedAt: report.generatedAt,
+      status: report.status
+    };
+
+    // Format based on report type
+    switch (report.type) {
+      case 'trip_analytics':
+        return {
+          ...baseInfo,
+          summary: {
+            totalTrips: report.data?.summary?.totalTrips || 0,
+            averageDuration: report.data?.summary?.avgTripDuration || 0,
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            favoriteDestination: report.data?.summary?.favoriteDestination || 'N/A',
+            estimatedCarbonFootprint: report.data?.summary?.estimatedCarbonFootprint || 0,
+            carbonSaved: report.data?.summary?.carbonSaved || 0
+          },
+          charts: ReportController.getRelevantCharts(report, ['Monthly Trips', 'Trip Types', 'Eco Score Trend'])
+        };
+
+      case 'packing_statistics':
+        return {
+          ...baseInfo,
+          summary: {
+            totalPackingLists: report.data?.summary?.totalPackingLists || 0,
+            completionRate: report.data?.summary?.completionRate || 0,
+            ecoItemPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            topEcoItems: report.data?.summary?.topEcoItems || [],
+            aiUsagePercentage: report.data?.summary?.aiUsagePercentage || 0
+          },
+          charts: ReportController.getRelevantCharts(report, ['Completion Rate Over Time', 'Eco Items Distribution'])
+        };
+
+      case 'news_section':
+        return {
+          ...baseInfo,
+          summary: {
+            totalArticlesFetched: report.data?.summary?.totalArticles || 0,
+            topSources: report.data?.summary?.topSources || [],
+            trendingTopics: report.data?.summary?.trendingTopics || [],
+            keywordAnalysis: report.data?.summary?.keywordAnalysis || {}
+          },
+          charts: ReportController.getRelevantCharts(report, ['Articles per Week', 'Source Distribution'])
+        };
+
+      case 'eco_inventory':
+        return {
+          ...baseInfo,
+          summary: {
+            totalEcoProducts: report.data?.summary?.totalProducts || 0,
+            trendingProducts: report.data?.summary?.trendingProducts || [],
+            averageEcoRating: report.data?.summary?.averageRating || 0,
+            ecoImpactEstimate: report.data?.summary?.impactEstimate || 0,
+            popularCategories: report.data?.summary?.popularCategories || []
+          },
+          charts: ReportController.getRelevantCharts(report, ['Product Category Distribution', 'Rating Distribution'])
+        };
+
+      case 'user_activity':
+        return {
+          ...baseInfo,
+          summary: {
+            totalPosts: report.data?.summary?.totalPosts || 0,
+            totalComments: report.data?.summary?.totalComments || 0,
+            totalLikes: report.data?.summary?.totalLikes || 0,
+            averageLikesPerPost: report.data?.summary?.avgLikesPerPost || 0,
+            ecoPostsShared: report.data?.summary?.ecoPostsShared || 0,
+            mostActiveTopics: report.data?.summary?.activeTopics || [],
+            topContributors: report.data?.summary?.topUsers || []
+          },
+          charts: ReportController.getRelevantCharts(report, ['Post Activity Over Time', 'Engagement Rate'])
+        };
+
+      case 'eco_impact':
+        return {
+          ...baseInfo,
+          summary: {
+            sustainabilityScore: report.data?.summary?.sustainabilityScore || 0,
+            carbonSaved: report.data?.summary?.carbonSaved || 0,
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            estimatedCarbonFootprint: report.data?.summary?.estimatedCarbonFootprint || 0,
+            ecoActions: report.data?.summary?.ecoActions || 0,
+            impactCategories: report.data?.summary?.impactCategories || {}
+          },
+          charts: ReportController.getRelevantCharts(report, ['Carbon Impact Over Time', 'Sustainability Score Trend'])
+        };
+
+      case 'budget_analysis':
+        return {
+          ...baseInfo,
+          summary: {
+            totalBudget: report.data?.summary?.totalBudget || 0,
+            averageSpending: report.data?.summary?.averageSpending || 0,
+            budgetUtilization: report.data?.summary?.budgetUtilization || 0,
+            topSpendingCategories: report.data?.summary?.topCategories || [],
+            savingsAchieved: report.data?.summary?.savings || 0
+          },
+          charts: ReportController.getRelevantCharts(report, ['Budget vs Actual', 'Spending Categories'])
+        };
+
+      case 'destination_trends':
+        return {
+          ...baseInfo,
+          summary: {
+            popularDestinations: report.data?.summary?.popularDestinations || [],
+            seasonalTrends: report.data?.summary?.seasonalTrends || {},
+            destinationGrowth: report.data?.summary?.growth || 0,
+            ecoDestinations: report.data?.summary?.ecoDestinations || []
+          },
+          charts: ReportController.getRelevantCharts(report, ['Destination Popularity', 'Seasonal Trends'])
+        };
+
+      default:
+        // For unknown types, return essential data only
+        return {
+          ...baseInfo,
+          summary: report.data?.summary || {},
+          charts: report.data?.charts?.slice(0, 3) || [] // Limit to 3 charts
+        };
+    }
+  }
+
+  // Helper method to get relevant charts based on chart titles
+  static getRelevantCharts(report, relevantTitles) {
+    if (!report.data?.charts) return [];
+    
+    return report.data.charts.filter(chart => 
+      relevantTitles.some(title => 
+        chart.title?.toLowerCase().includes(title.toLowerCase()) ||
+        title.toLowerCase().includes(chart.title?.toLowerCase())
+      )
+    ).slice(0, 3); // Limit to 3 most relevant charts
   }
 
   // Helper method to generate CSV
@@ -342,17 +484,27 @@ class ReportController {
     csvContent += 'Summary Metrics\n';
     csvContent += 'Metric,Value\n';
     
-    if (report.data && report.data.summary) {
-      Object.entries(report.data.summary).forEach(([key, value]) => {
-        csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${value}\n`;
+    // Handle both old structure (report.data.summary) and new structure (report.summary)
+    const summaryData = report.summary || report.data?.summary;
+    if (summaryData) {
+      Object.entries(summaryData).forEach(([key, value]) => {
+        // Handle arrays and objects differently
+        if (Array.isArray(value)) {
+          csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${value.join('; ')}\n`;
+        } else if (typeof value === 'object' && value !== null) {
+          csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${JSON.stringify(value)}\n`;
+        } else {
+          csvContent += `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())},${value}\n`;
+        }
       });
     }
     
     csvContent += '\n';
     
-    // Chart data
-    if (report.data && report.data.charts) {
-      report.data.charts.forEach((chart, index) => {
+    // Chart data - handle both structures
+    const chartData = report.charts || report.data?.charts;
+    if (chartData && chartData.length > 0) {
+      chartData.forEach((chart, index) => {
         csvContent += `Chart ${index + 1}: ${chart.title}\n`;
         csvContent += 'Label,Value\n';
         
@@ -427,8 +579,9 @@ class ReportController {
     worksheet.getCell(`B${row}`).value = report.status;
     row += 2;
     
-    // Summary section
-    if (report.data && report.data.summary) {
+    // Summary section - handle both structures
+    const summaryData = report.summary || report.data?.summary;
+    if (summaryData) {
       worksheet.getCell(`A${row}`).value = 'Summary Metrics';
       worksheet.getCell(`A${row}`).font = { bold: true };
       row++;
@@ -438,16 +591,25 @@ class ReportController {
       worksheet.getRow(row).font = { bold: true };
       row++;
       
-      Object.entries(report.data.summary).forEach(([key, value]) => {
+      Object.entries(summaryData).forEach(([key, value]) => {
         worksheet.getCell(`A${row}`).value = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-        worksheet.getCell(`B${row}`).value = value;
+        
+        // Handle arrays and objects for Excel
+        if (Array.isArray(value)) {
+          worksheet.getCell(`B${row}`).value = value.join(', ');
+        } else if (typeof value === 'object' && value !== null) {
+          worksheet.getCell(`B${row}`).value = JSON.stringify(value);
+        } else {
+          worksheet.getCell(`B${row}`).value = value;
+        }
         row++;
       });
     }
     
-    // Charts as separate sheets
-    if (report.data && report.data.charts) {
-      report.data.charts.forEach((chart, index) => {
+    // Charts as separate sheets - handle both structures
+    const chartData = report.charts || report.data?.charts;
+    if (chartData && chartData.length > 0) {
+      chartData.forEach((chart, index) => {
         const chartSheet = workbook.addWorksheet(`Chart ${index + 1}`);
         
         // Chart title
@@ -608,20 +770,30 @@ class ReportController {
         </div>
     `;
 
-    // Summary section
-    if (report.data && report.data.summary) {
+    // Summary section - handle both old structure (report.data.summary) and new structure (report.summary)
+    const summaryData = report.summary || report.data?.summary;
+    if (summaryData) {
       html += `
         <div class="section">
             <div class="section-title">Summary Metrics</div>
             <div class="summary-grid">
       `;
       
-      Object.entries(report.data.summary).forEach(([key, value]) => {
+      Object.entries(summaryData).forEach(([key, value]) => {
         const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        let displayValue = formatValue(value);
+        
+        // Handle arrays and objects for display
+        if (Array.isArray(value)) {
+          displayValue = value.slice(0, 3).join(', ') + (value.length > 3 ? '...' : '');
+        } else if (typeof value === 'object' && value !== null) {
+          displayValue = 'See details below';
+        }
+        
         html += `
           <div class="metric-card">
               <div class="metric-label">${label}</div>
-              <div class="metric-value">${formatValue(value)}</div>
+              <div class="metric-value">${displayValue}</div>
           </div>
         `;
       });
@@ -632,14 +804,15 @@ class ReportController {
       `;
     }
 
-    // Charts section
-    if (report.data && report.data.charts && report.data.charts.length > 0) {
+    // Charts section - handle both structures
+    const chartData = report.charts || report.data?.charts;
+    if (chartData && chartData.length > 0) {
       html += `
         <div class="section">
             <div class="section-title">Charts & Analytics</div>
       `;
       
-      report.data.charts.forEach((chart, index) => {
+      chartData.forEach((chart, index) => {
         html += `
           <div class="chart-section">
               <div class="chart-title">${chart.title}</div>

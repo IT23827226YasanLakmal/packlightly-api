@@ -5,28 +5,18 @@ module.exports = {
   trip_analytics: {
     mandatory: [
       'summary.totalTrips',
-      'summary.uniqueDestinations',
-      'summary.favoriteDestination',
-      'summary.avgTripDuration',
-      'summary.ecoFriendlyPercentage',
-      'charts'
-    ],
-    optional: [
-      'summary.returnVisits',
-      'summary.estimatedCarbonFootprint',
-      'summary.carbonSaved',
       'summary.totalBudget',
+      'summary.avgTripDuration',
       'summary.avgBudget',
       'summary.maxBudget',
       'summary.minBudget',
+      'summary.estimatedCarbonFootprint',
+      'summary.uniqueDestinations',
+      'summary.favoriteDestination',
       'summary.avgStayDuration',
-      'details.topDestinations',
-      'details.monthlyBreakdown',
-      'details.ecoImpactBreakdown',
-      'details.recommendations',
-      'details.recentTrips',
-      'details.travelPatterns'
-    ]
+      'charts'
+    ],
+    optional: []
   },
   
   packing_statistics: {
