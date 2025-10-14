@@ -19,7 +19,9 @@ const ReportSchema = new mongoose.Schema({
       'user_activity',
       'eco_impact',
       'budget_analysis',
-      'destination_trends'
+      'destination_trends',
+      'eco_inventory',
+      'news_section'
     ],
     required: true
   },
@@ -60,7 +62,19 @@ const ReportSchema = new mongoose.Schema({
       uniqueDestinations: { type: Number, default: 0, min: 0 },
       favoriteDestination: { type: String, trim: true },
       avgStayDuration: { type: Number, default: 0, min: 0 },
-      returnVisits: { type: Number, default: 0, min: 0 }
+      returnVisits: { type: Number, default: 0, min: 0 },
+      // Eco inventory fields
+      totalEcoProducts: { type: Number, default: 0, min: 0 },
+      ecoProductsByCategory: { type: mongoose.Schema.Types.Mixed, default: {} },
+      avgEcoRating: { type: Number, default: 0, min: 0, max: 5 },
+      sustainableProducts: { type: Number, default: 0, min: 0 },
+      ecoProductAvailability: { type: mongoose.Schema.Types.Mixed, default: {} },
+      // News section fields
+      totalNewsArticles: { type: Number, default: 0, min: 0 },
+      newsBySource: { type: mongoose.Schema.Types.Mixed, default: {} },
+      recentArticles: { type: Number, default: 0, min: 0 },
+      trendingTopics: { type: mongoose.Schema.Types.Mixed, default: {} },
+      publicationFrequency: { type: mongoose.Schema.Types.Mixed, default: {} }
     },
     charts: [
       {
@@ -264,5 +278,51 @@ ReportSchema.pre('save', function(next) {
   
   next();
 });
+
+// Static method to get available report types
+ReportSchema.statics.getReportTypes = function() {
+  return [
+    {
+      value: 'trip_analytics',
+      label: 'Trip Analytics',
+      description: 'Comprehensive analysis of travel patterns, destinations, and trip statistics'
+    },
+    {
+      value: 'packing_statistics',
+      label: 'Packing Statistics',
+      description: 'Analysis of packing lists, item usage, and packing efficiency'
+    },
+    {
+      value: 'user_activity',
+      label: 'User Activity',
+      description: 'Overview of user engagement, posts, likes, and platform usage'
+    },
+    {
+      value: 'eco_impact',
+      label: 'Eco Impact',
+      description: 'Environmental impact analysis and sustainability metrics'
+    },
+    {
+      value: 'budget_analysis',
+      label: 'Budget Analysis',
+      description: 'Financial analysis of travel expenses and budget optimization'
+    },
+    {
+      value: 'destination_trends',
+      label: 'Destination Trends',
+      description: 'Popular destinations, travel patterns, and location analytics'
+    },
+    {
+      value: 'eco_inventory',
+      label: 'Eco Inventory',
+      description: 'Analysis of eco-friendly products, ratings, and availability'
+    },
+    {
+      value: 'news_section',
+      label: 'News Section',
+      description: 'News analytics including sources, trends, and publication patterns'
+    }
+  ];
+};
 
 module.exports = mongoose.model('Report', ReportSchema);

@@ -3,6 +3,7 @@ const Trip = require('../models/Trip');
 const PackingList = require('../models/PackingList');
 const Post = require('../models/Post');
 const Product = require('../models/Product');
+const News = require('../models/News');
 
 class ReportService {
   // Create a new report
@@ -646,6 +647,257 @@ class ReportService {
     return this.create(reportData);
   }
 
+  // Generate Eco Inventory Report
+  static async generateEcoInventory(ownerUid, filters = {}) {
+    const query = {};
+    
+    // Apply eco rating filter if provided
+    if (filters.minEcoRating) {
+      query.eco = { $gte: filters.minEcoRating };
+    }
+
+    // Apply category filter if provided
+    if (filters.category) {
+      query.category = new RegExp(filters.category, 'i');
+    }
+
+    const products = await Product.find(query);
+
+    // Calculate summary statistics
+    const totalEcoProducts = products.length;
+    const avgEcoRating = totalEcoProducts > 0 ? 
+      Math.round((products.reduce((sum, product) => sum + (product.eco || 0), 0) / totalEcoProducts) * 100) / 100 : 0;
+
+    // Group by category
+    const ecoProductsByCategory = {};
+    products.forEach(product => {
+      const category = product.category || 'Uncategorized';
+      if (!ecoProductsByCategory[category]) {
+        ecoProductsByCategory[category] = [];
+      }
+      ecoProductsByCategory[category].push(product);
+    });
+
+    // Calculate category stats
+    const categoryStats = Object.entries(ecoProductsByCategory).map(([category, prods]) => ({
+      category,
+      count: prods.length,
+      avgEcoRating: Math.round((prods.reduce((sum, p) => sum + (p.eco || 0), 0) / prods.length) * 100) / 100,
+      products: prods.slice(0, 5) // Limit to top 5 for details
+    }));
+
+    // Count sustainable products (eco rating 4 or higher)
+    const sustainableProducts = products.filter(p => (p.eco || 0) >= 4).length;
+
+    // Availability analysis
+    const ecoProductAvailability = {};
+    products.forEach(product => {
+      if (product.availableLocation && Array.isArray(product.availableLocation)) {
+        product.availableLocation.forEach(location => {
+          ecoProductAvailability[location] = (ecoProductAvailability[location] || 0) + 1;
+        });
+      }
+    });
+
+    // Top locations with most eco products
+    const topLocations = Object.entries(ecoProductAvailability)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([location, count]) => ({ location, count }));
+
+    // Eco rating distribution
+    const ratingDistribution = {};
+    for (let i = 1; i <= 5; i++) {
+      ratingDistribution[i] = products.filter(p => Math.floor(p.eco || 0) === i).length;
+    }
+
+    const reportData = {
+      ownerUid,
+      title: 'Eco Inventory Analysis',
+      type: 'eco_inventory',
+      filters,
+      data: {
+        summary: {
+          totalEcoProducts,
+          ecoProductsByCategory: Object.keys(ecoProductsByCategory).reduce((acc, cat) => {
+            acc[cat] = ecoProductsByCategory[cat].length;
+            return acc;
+          }, {}),
+          avgEcoRating,
+          sustainableProducts,
+          ecoProductAvailability: topLocations.reduce((acc, loc) => {
+            acc[loc.location] = loc.count;
+            return acc;
+          }, {})
+        },
+        charts: [
+          {
+            type: 'bar',
+            title: 'Products by Category',
+            data: categoryStats.map(c => c.count),
+            labels: categoryStats.map(c => c.category)
+          },
+          {
+            type: 'pie',
+            title: 'Eco Rating Distribution',
+            data: Object.values(ratingDistribution),
+            labels: Object.keys(ratingDistribution).map(r => `${r} Star${r !== '1' ? 's' : ''}`)
+          },
+          {
+            type: 'bar',
+            title: 'Top Locations by Eco Product Availability',
+            data: topLocations.map(l => l.count),
+            labels: topLocations.map(l => l.location)
+          }
+        ],
+        details: {
+          categoryStats,
+          topLocations,
+          ratingDistribution,
+          highestRatedProducts: products
+            .filter(p => (p.eco || 0) >= 4)
+            .sort((a, b) => (b.eco || 0) - (a.eco || 0))
+            .slice(0, 10),
+          availabilityStats: ecoProductAvailability
+        }
+      }
+    };
+
+    return this.create(reportData);
+  }
+
+  // Generate News Section Report
+  static async generateNewsSection(ownerUid, filters = {}) {
+    const query = {};
+    
+    // Apply date filters
+    if (filters.dateRange?.startDate || filters.dateRange?.endDate) {
+      query.pubDate = {};
+      if (filters.dateRange.startDate) {
+        query.pubDate.$gte = new Date(filters.dateRange.startDate);
+      }
+      if (filters.dateRange.endDate) {
+        query.pubDate.$lte = new Date(filters.dateRange.endDate);
+      }
+    }
+
+    // Apply source filter
+    if (filters.source) {
+      query.source_id = new RegExp(filters.source, 'i');
+    }
+
+    const articles = await News.find(query).sort({ pubDate: -1 });
+
+    // Calculate summary statistics
+    const totalNewsArticles = articles.length;
+    
+    // Group by source
+    const newsBySource = {};
+    articles.forEach(article => {
+      const source = article.source_id || 'Unknown';
+      newsBySource[source] = (newsBySource[source] || 0) + 1;
+    });
+
+    // Recent articles (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentArticles = articles.filter(article => 
+      article.pubDate && new Date(article.pubDate) >= sevenDaysAgo
+    ).length;
+
+    // Trending topics analysis (based on title keywords)
+    const trendingTopics = {};
+    const commonWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an'];
+    
+    articles.forEach(article => {
+      if (article.title) {
+        const words = article.title.toLowerCase()
+          .replace(/[^\w\s]/g, '')
+          .split(/\s+/)
+          .filter(word => word.length > 3 && !commonWords.includes(word));
+        
+        words.forEach(word => {
+          trendingTopics[word] = (trendingTopics[word] || 0) + 1;
+        });
+      }
+    });
+
+    // Get top trending topics
+    const topTrending = Object.entries(trendingTopics)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([topic, count]) => ({ topic, count }));
+
+    // Publication frequency by month
+    const publicationFrequency = {};
+    articles.forEach(article => {
+      if (article.pubDate) {
+        const month = new Date(article.pubDate).toISOString().slice(0, 7); // YYYY-MM
+        publicationFrequency[month] = (publicationFrequency[month] || 0) + 1;
+      }
+    });
+
+    // Top sources
+    const topSources = Object.entries(newsBySource)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([source, count]) => ({ source, count }));
+
+    const reportData = {
+      ownerUid,
+      title: 'News Section Analytics',
+      type: 'news_section',
+      filters,
+      data: {
+        summary: {
+          totalNewsArticles,
+          newsBySource: Object.keys(newsBySource).reduce((acc, source) => {
+            acc[source] = newsBySource[source];
+            return acc;
+          }, {}),
+          recentArticles,
+          trendingTopics: topTrending.reduce((acc, topic) => {
+            acc[topic.topic] = topic.count;
+            return acc;
+          }, {}),
+          publicationFrequency
+        },
+        charts: [
+          {
+            type: 'bar',
+            title: 'Articles by Source',
+            data: topSources.map(s => s.count),
+            labels: topSources.map(s => s.source)
+          },
+          {
+            type: 'line',
+            title: 'Publication Timeline',
+            data: Object.values(publicationFrequency),
+            labels: Object.keys(publicationFrequency).sort()
+          },
+          {
+            type: 'doughnut',
+            title: 'Trending Topics',
+            data: topTrending.slice(0, 6).map(t => t.count),
+            labels: topTrending.slice(0, 6).map(t => t.topic)
+          }
+        ],
+        details: {
+          topSources,
+          topTrending,
+          recentArticles: articles
+            .filter(article => new Date(article.pubDate) >= sevenDaysAgo)
+            .slice(0, 10),
+          publicationStats: publicationFrequency,
+          sourceDistribution: newsBySource,
+          latestArticles: articles.slice(0, 10)
+        }
+      }
+    };
+
+    return this.create(reportData);
+  }
+
   // Main method to generate any type of report
   static async generateReport(type, ownerUid, filters = {}) {
     switch (type) {
@@ -661,6 +913,10 @@ class ReportService {
         return this.generateBudgetAnalysis(ownerUid, filters);
       case 'destination_trends':
         return this.generateDestinationTrends(ownerUid, filters);
+      case 'eco_inventory':
+        return this.generateEcoInventory(ownerUid, filters);
+      case 'news_section':
+        return this.generateNewsSection(ownerUid, filters);
       default:
         throw new Error(`Unknown report type: ${type}`);
     }

@@ -34,8 +34,7 @@ class WeatherService {
         `${BASE_URL}/forecast?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric`
       );
 
-      const forecastList = forecastResponse.list || [];
-      console.log(forecastList);
+      const forecastList = forecastResponse.data.list || [];
       const filteredForecast = this.filterForecastForDates(forecastList, startDate, endDate);
 
       return this.formatWeatherData(filteredForecast, location);
