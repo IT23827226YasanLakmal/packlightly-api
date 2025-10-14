@@ -327,7 +327,7 @@ class ReportController {
     }
   }
 
-  // Helper method to generate enhanced CSV
+  // Helper method to generate CSV
   static generateCSV(report) {
     let csvContent = '';
     
@@ -698,103 +698,6 @@ class ReportController {
     `;
 
     return html;
-  }
-
-  // POST /api/reports/enhanced - Generate enhanced standardized reports
-  static async generateEnhanced(req, res, next) {
-    try {
-      const { type, filters = {}, format = 'json', title } = req.body;
-      
-      // Validate required fields
-      if (!type) {
-        return res.status(400).json({
-          success: false,
-          message: 'Report type is required'
-        });
-      }
-
-      // Validate report type
-      const validTypes = ReportService.getReportTypes().map(t => t.value);
-      if (!validTypes.includes(type)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid report type. Valid types are: ${validTypes.join(', ')}`
-        });
-      }
-
-      // Validate filters
-      const validation = ReportFormatHelpers.validateReportStructure({
-        ownerUid: req.user.uid,
-        title: title || 'Test Report',
-        type,
-        filters,
-        data: { summary: {}, charts: [], details: {} }
-      });
-
-      if (!validation.isValid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid report structure',
-          errors: validation.errors
-        });
-      }
-
-      let reportData;
-
-      // Generate report using unified ReportService
-      reportData = await ReportService.generateReport(type, req.user.uid, filters);
-
-      // Update title if provided
-      if (title && title.trim()) {
-        await ReportService.updateReportTitle(reportData._id, title.trim());
-        reportData.title = title.trim(); // Update the returned object as well
-      }
-
-      // Set format if needed
-      if (format && format !== 'json') {
-        reportData.format = format;
-        // Update in database if format is specified
-        const Report = require('../models/Report');
-        await Report.findByIdAndUpdate(reportData._id, { format });
-      }
-
-      // The report is already saved by ReportService.generateReport()
-      const savedReport = reportData;
-
-      // Validate the generated report
-      const finalValidation = savedReport.validateReportData();
-      if (finalValidation.length > 0) {
-        console.warn('Report validation warnings:', finalValidation);
-      }
-
-      res.status(201).json({
-        success: true,
-        data: savedReport,
-        message: 'Enhanced report generated successfully',
-        format: savedReport.format,
-        validation: {
-          isValid: finalValidation.length === 0,
-          warnings: finalValidation
-        },
-        metadata: {
-          estimatedSize: savedReport.getEstimatedSize(),
-          generationTime: new Date() - savedReport.generatedAt + 'ms',
-          reportAge: savedReport.reportAge
-        }
-      });
-
-    } catch (error) {
-      console.error('Generate enhanced report error:', error);
-      
-      if (error.message.includes('Failed to generate')) {
-        return res.status(422).json({
-          success: false,
-          message: error.message
-        });
-      }
-      
-      next(error);
-    }
   }
 
   // GET /api/reports/sample/:type - Generate sample data for testing report formats

@@ -27,9 +27,6 @@ router.post('/generate', ReportController.generate);
 // POST /api/reports/generate-sync - Generate a new report (sync)
 router.post('/generate-sync', ReportController.generateSync);
 
-// POST /api/reports/enhanced - Generate enhanced standardized reports
-router.post('/enhanced', ReportController.generateEnhanced);
-
 // GET /api/reports/:id - Get a specific report
 router.get('/:id', ReportController.get);
 

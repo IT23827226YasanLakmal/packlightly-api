@@ -246,7 +246,7 @@ class ReportService {
     const avgTripDuration = totalTrips > 0 ? 
       trips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / totalTrips : 0;
 
-    // Enhanced metrics for better analytics
+    // Metrics for better analytics
     const uniqueDestinations = [...new Set(trips.map(trip => trip.destination).filter(Boolean))].length;
     const ecoTrips = trips.filter(trip => trip.isEcoFriendly || trip.ecoScore >= 70);
     const ecoFriendlyPercentage = totalTrips > 0 ? Math.round((ecoTrips.length / totalTrips) * 100) : 0;
@@ -320,7 +320,7 @@ class ReportService {
       else budgetRanges['5000+']++;
     });
 
-    // Enhanced top destinations with metrics
+    // Top destinations with metrics
     const topDestinations = Object.entries(destinationCounts)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 10)
@@ -339,7 +339,7 @@ class ReportService {
         };
       });
 
-    // Monthly breakdown with enhanced metrics
+    // Monthly breakdown with metrics
     const monthlyBreakdown = Object.entries(monthlyData)
       .map(([month, tripCount]) => {
         const monthTrips = trips.filter(trip => {
@@ -362,7 +362,7 @@ class ReportService {
       })
       .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
-    // Enhanced eco impact breakdown
+    // Eco impact breakdown
     const ecoImpactBreakdown = {
       transportationSavings: trips.reduce((sum, trip) => sum + (trip.transportationSavings || 0), 0),
       accommodationSavings: trips.reduce((sum, trip) => sum + (trip.accommodationSavings || 0), 0),
@@ -395,7 +395,7 @@ class ReportService {
 
     const reportData = {
       ownerUid,
-      title: 'Trip Analytics Report - Enhanced',
+      title: 'Trip Analytics Report',
       type: 'trip_analytics',
       filters,
       data: {
@@ -556,7 +556,7 @@ class ReportService {
       }
     });
 
-    // Calculate enhanced metrics
+    // Calculate metrics
     const completionRate = totalItems > 0 ? (checkedItems / totalItems) * 100 : 0;
     const ecoPercentage = totalItems > 0 ? (ecoItems / totalItems) * 100 : 0;
     const aiUsagePercentage = totalItems > 0 ? (aiGeneratedItems / totalItems) * 100 : 0;
@@ -570,7 +570,7 @@ class ReportService {
       stats.completionRate = stats.total > 0 ? (stats.checked / stats.total) * 100 : 0;
     });
 
-    // Most common items with enhanced data
+    // Most common items with data
     const commonItems = Object.entries(itemFrequency)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 20)
@@ -580,7 +580,7 @@ class ReportService {
         frequency: Math.round((count / totalLists) * 100) // Percentage of lists containing this item
       }));
 
-    // Enhanced category breakdown
+    // Category breakdown
     const categoryBreakdown = Object.entries(categoryStats).map(([category, stats]) => ({
       category,
       totalItems: stats.total,
@@ -647,7 +647,7 @@ class ReportService {
 
     const reportData = {
       ownerUid,
-      title: 'Packing Statistics Report - Enhanced',
+      title: 'Packing Statistics Report',
       type: 'packing_statistics',
       filters,
       data: {
@@ -831,6 +831,39 @@ class ReportService {
     const aiUsagePercentage = packingLists.length > 0 ? 
       (aiGeneratedLists / packingLists.length) * 100 : 0;
 
+    // Clean recent activity data - remove sensitive/excessive information
+    const cleanRecentActivity = allItems.slice(0, 20).map(item => {
+      const cleanItem = {
+        id: item._id,
+        title: item.title,
+        type: item.type || (item.tags ? 'post' : (item.tripId ? 'packinglist' : 'trip')),
+        createdAt: item.createdAt || item.date,
+        status: item.status
+      };
+
+      // Add specific fields based on item type
+      if (item.destination) {
+        cleanItem.destination = item.destination;
+        cleanItem.startDate = item.startDate;
+        cleanItem.endDate = item.endDate;
+        cleanItem.durationDays = item.durationDays;
+      }
+      
+      if (item.tags) {
+        cleanItem.tags = item.tags;
+        cleanItem.likeCount = item.likeCount || 0;
+        cleanItem.commentCount = item.comments?.length || 0;
+      }
+
+      if (item.tripId) {
+        cleanItem.tripId = item.tripId;
+        cleanItem.isAIGenerated = item.isAIGenerated;
+        cleanItem.totalItems = item.categories?.reduce((sum, cat) => sum + (cat.items?.length || 0), 0) || 0;
+      }
+
+      return cleanItem;
+    });
+
     const reportData = {
       ownerUid,
       title: 'User Activity Report',
@@ -838,11 +871,18 @@ class ReportService {
       filters,
       data: {
         summary: {
+          // Core activity metrics
           totalTrips: trips.length,
           totalPackingLists: packingLists.length,
           totalPosts: posts.length,
+          
+          // Engagement metrics
           totalLikes: totalLikes,
-          avgLikesPerPost: posts.length > 0 ? Math.round(totalLikes / posts.length) : 0
+          avgLikesPerPost: posts.length > 0 ? Math.round(totalLikes / posts.length) : 0,
+          totalComments: totalComments,
+          
+          // AI usage
+          aiUsagePercentage: Math.round(aiUsagePercentage)
         },
         charts: [
           {
@@ -859,9 +899,9 @@ class ReportService {
           }
         ],
         details: {
-          recentActivity: allItems.slice(0, 20),
-          aiUsagePercentage: Math.round(aiUsagePercentage),
-          engagementRate: posts.length > 0 ? Math.round(((totalLikes + totalComments) / posts.length) * 100) / 100 : 0,
+          recentActivity: cleanRecentActivity,
+          engagementRate: posts.length > 0 ? 
+            Math.round(((totalLikes + totalComments) / posts.length) * 100) / 100 : 0,
           memberSince: trips[0]?.createdAt || packingLists[0]?.createdAt || new Date()
         }
       }

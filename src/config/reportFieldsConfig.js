@@ -113,21 +113,19 @@ module.exports = {
   
   user_activity: {
     mandatory: [
-      'summary.totalUsers',
-      'summary.activeUsers',
-      'summary.newUsers',
+      'summary.totalTrips',
+      'summary.totalPackingLists', 
+      'summary.totalPosts',
+      'summary.totalLikes',
+      'summary.avgLikesPerPost',
       'charts'
     ],
     optional: [
-      'summary.inactiveUsers',
-      'summary.retentionRate',
-      'summary.avgSessionDuration',
-      'details.userGrowthTrend',
+      'summary.totalComments',
+      'summary.aiUsagePercentage',
+      'details.recentActivity',
       'details.engagementRate',
-      'details.recommendations',
-      'details.activityPatterns',
-      'details.demographicBreakdown',
-      'details.featureUsage'
+      'details.memberSince'
     ]
   },
   

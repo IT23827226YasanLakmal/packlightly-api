@@ -54,24 +54,24 @@ try {
   const ReportController = require('./src/controllers/report.controller');
   console.log('✅ Report controller loaded successfully');
   
-  const EnhancedReportService = require('./src/services/enhancedReport.service');
-  console.log('✅ Enhanced report service loaded successfully');
+  console.log('✅ Enhanced report service removed (cleanup completed)');
   
-  // Check if enhanced service has the required methods
+  // Check if main service has the required methods
+  const ReportService = require('./src/services/report.service');
   const methods = [
-    'generateTripAnalyticsReport',
-    'generatePackingStatisticsReport', 
-    'generateUserActivityReport',
-    'generateEcoImpactReport',
-    'generateBudgetAnalysisReport',
-    'generateDestinationTrendsReport',
-    'generateEcoInventoryReport',
-    'generateNewsSectionReport'
+    'generateTripAnalytics',
+    'generatePackingStatistics', 
+    'generateUserActivity',
+    'generateEcoImpact',
+    'generateBudgetAnalysis',
+    'generateDestinationTrends',
+    'generateEcoInventory',
+    'generateNewsSection'
   ];
   
-  console.log('\n📊 Enhanced Service Methods:');
+  console.log('\n📊 Main Service Methods:');
   methods.forEach(method => {
-    const exists = typeof EnhancedReportService[method] === 'function';
+    const exists = typeof ReportService[method] === 'function';
     console.log(`  ${method}: ${exists ? '✅' : '❌'}`);
   });
   
