@@ -336,7 +336,13 @@ class ReportController {
       title: report.title,
       type: report.type,
       generatedAt: report.generatedAt,
-      status: report.status
+      status: report.status,
+      format: report.format,
+      isScheduled: report.isScheduled,
+      scheduleFrequency: report.scheduleFrequency,
+      lastGenerated: report.lastGenerated,
+      tags: report.tags || [],
+      filters: report.filters || {}
     };
 
     // Format based on report type
@@ -346,13 +352,17 @@ class ReportController {
           ...baseInfo,
           summary: {
             totalTrips: report.data?.summary?.totalTrips || 0,
-            averageDuration: report.data?.summary?.avgTripDuration || 0,
-            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            uniqueDestinations: report.data?.summary?.uniqueDestinations || 0,
             favoriteDestination: report.data?.summary?.favoriteDestination || 'N/A',
+            avgTripDuration: report.data?.summary?.avgTripDuration || 0,
+            avgStayDuration: report.data?.summary?.avgStayDuration || 0,
+            returnVisits: report.data?.summary?.returnVisits || 0,
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
             estimatedCarbonFootprint: report.data?.summary?.estimatedCarbonFootprint || 0,
-            carbonSaved: report.data?.summary?.carbonSaved || 0
+            carbonSaved: report.data?.summary?.carbonSaved || 0,
+            sustainabilityScore: report.data?.summary?.sustainabilityScore || 0
           },
-          charts: ReportController.getRelevantCharts(report, ['Monthly Trips', 'Trip Types', 'Eco Score Trend'])
+          charts: ReportController.getRelevantCharts(report, ['Monthly Trips', 'Trip Types', 'Eco Score Trend', 'Destination Popularity'])
         };
 
       case 'packing_statistics':
@@ -361,36 +371,40 @@ class ReportController {
           summary: {
             totalPackingLists: report.data?.summary?.totalPackingLists || 0,
             completionRate: report.data?.summary?.completionRate || 0,
-            ecoItemPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
-            topEcoItems: report.data?.summary?.topEcoItems || [],
-            aiUsagePercentage: report.data?.summary?.aiUsagePercentage || 0
+            aiUsagePercentage: report.data?.summary?.aiUsagePercentage || 0,
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            avgTripDuration: report.data?.summary?.avgTripDuration || 0,
+            sustainabilityScore: report.data?.summary?.sustainabilityScore || 0,
+            carbonSaved: report.data?.summary?.carbonSaved || 0
           },
-          charts: ReportController.getRelevantCharts(report, ['Completion Rate Over Time', 'Eco Items Distribution'])
+          charts: ReportController.getRelevantCharts(report, ['Completion Rate Over Time', 'Eco Items Distribution', 'AI Usage Trends'])
         };
 
       case 'news_section':
         return {
           ...baseInfo,
           summary: {
-            totalArticlesFetched: report.data?.summary?.totalArticles || 0,
-            topSources: report.data?.summary?.topSources || [],
-            trendingTopics: report.data?.summary?.trendingTopics || [],
-            keywordAnalysis: report.data?.summary?.keywordAnalysis || {}
+            totalNewsArticles: report.data?.summary?.totalNewsArticles || 0,
+            recentArticles: report.data?.summary?.recentArticles || 0,
+            newsBySource: report.data?.summary?.newsBySource || {},
+            trendingTopics: report.data?.summary?.trendingTopics || {},
+            publicationFrequency: report.data?.summary?.publicationFrequency || {}
           },
-          charts: ReportController.getRelevantCharts(report, ['Articles per Week', 'Source Distribution'])
+          charts: ReportController.getRelevantCharts(report, ['Articles per Week', 'Source Distribution', 'Trending Topics'])
         };
 
       case 'eco_inventory':
         return {
           ...baseInfo,
           summary: {
-            totalEcoProducts: report.data?.summary?.totalProducts || 0,
-            trendingProducts: report.data?.summary?.trendingProducts || [],
-            averageEcoRating: report.data?.summary?.averageRating || 0,
-            ecoImpactEstimate: report.data?.summary?.impactEstimate || 0,
-            popularCategories: report.data?.summary?.popularCategories || []
+            totalEcoProducts: report.data?.summary?.totalEcoProducts || 0,
+            sustainableProducts: report.data?.summary?.sustainableProducts || 0,
+            avgEcoRating: report.data?.summary?.avgEcoRating || 0,
+            ecoProductsByCategory: report.data?.summary?.ecoProductsByCategory || {},
+            ecoProductAvailability: report.data?.summary?.ecoProductAvailability || {},
+            sustainabilityScore: report.data?.summary?.sustainabilityScore || 0
           },
-          charts: ReportController.getRelevantCharts(report, ['Product Category Distribution', 'Rating Distribution'])
+          charts: ReportController.getRelevantCharts(report, ['Product Category Distribution', 'Rating Distribution', 'Availability Trends'])
         };
 
       case 'user_activity':
@@ -398,14 +412,13 @@ class ReportController {
           ...baseInfo,
           summary: {
             totalPosts: report.data?.summary?.totalPosts || 0,
-            totalComments: report.data?.summary?.totalComments || 0,
             totalLikes: report.data?.summary?.totalLikes || 0,
-            averageLikesPerPost: report.data?.summary?.avgLikesPerPost || 0,
+            avgLikesPerPost: report.data?.summary?.avgLikesPerPost || 0,
             ecoPostsShared: report.data?.summary?.ecoPostsShared || 0,
-            mostActiveTopics: report.data?.summary?.activeTopics || [],
-            topContributors: report.data?.summary?.topUsers || []
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            sustainabilityScore: report.data?.summary?.sustainabilityScore || 0
           },
-          charts: ReportController.getRelevantCharts(report, ['Post Activity Over Time', 'Engagement Rate'])
+          charts: ReportController.getRelevantCharts(report, ['Post Activity Over Time', 'Engagement Rate', 'Eco Posts Trends'])
         };
 
       case 'eco_impact':
@@ -414,12 +427,15 @@ class ReportController {
           summary: {
             sustainabilityScore: report.data?.summary?.sustainabilityScore || 0,
             carbonSaved: report.data?.summary?.carbonSaved || 0,
-            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
             estimatedCarbonFootprint: report.data?.summary?.estimatedCarbonFootprint || 0,
-            ecoActions: report.data?.summary?.ecoActions || 0,
-            impactCategories: report.data?.summary?.impactCategories || {}
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            totalTrips: report.data?.summary?.totalTrips || 0,
+            totalPosts: report.data?.summary?.totalPosts || 0,
+            ecoPostsShared: report.data?.summary?.ecoPostsShared || 0,
+            totalEcoProducts: report.data?.summary?.totalEcoProducts || 0,
+            sustainableProducts: report.data?.summary?.sustainableProducts || 0
           },
-          charts: ReportController.getRelevantCharts(report, ['Carbon Impact Over Time', 'Sustainability Score Trend'])
+          charts: ReportController.getRelevantCharts(report, ['Carbon Impact Over Time', 'Sustainability Score Trend', 'Eco Actions'])
         };
 
       case 'budget_analysis':
@@ -427,32 +443,43 @@ class ReportController {
           ...baseInfo,
           summary: {
             totalBudget: report.data?.summary?.totalBudget || 0,
-            averageSpending: report.data?.summary?.averageSpending || 0,
-            budgetUtilization: report.data?.summary?.budgetUtilization || 0,
-            topSpendingCategories: report.data?.summary?.topCategories || [],
-            savingsAchieved: report.data?.summary?.savings || 0
+            avgBudget: report.data?.summary?.avgBudget || 0,
+            minBudget: report.data?.summary?.minBudget || 0,
+            maxBudget: report.data?.summary?.maxBudget || 0,
+            totalTrips: report.data?.summary?.totalTrips || 0,
+            avgTripDuration: report.data?.summary?.avgTripDuration || 0,
+            avgStayDuration: report.data?.summary?.avgStayDuration || 0,
+            uniqueDestinations: report.data?.summary?.uniqueDestinations || 0,
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0
           },
-          charts: ReportController.getRelevantCharts(report, ['Budget vs Actual', 'Spending Categories'])
+          charts: ReportController.getRelevantCharts(report, ['Budget vs Actual', 'Spending Categories', 'Budget Trends'])
         };
 
       case 'destination_trends':
         return {
           ...baseInfo,
           summary: {
-            popularDestinations: report.data?.summary?.popularDestinations || [],
-            seasonalTrends: report.data?.summary?.seasonalTrends || {},
-            destinationGrowth: report.data?.summary?.growth || 0,
-            ecoDestinations: report.data?.summary?.ecoDestinations || []
+            totalTrips: report.data?.summary?.totalTrips || 0,
+            uniqueDestinations: report.data?.summary?.uniqueDestinations || 0,
+            favoriteDestination: report.data?.summary?.favoriteDestination || 'N/A',
+            returnVisits: report.data?.summary?.returnVisits || 0,
+            avgTripDuration: report.data?.summary?.avgTripDuration || 0,
+            avgStayDuration: report.data?.summary?.avgStayDuration || 0,
+            ecoFriendlyPercentage: report.data?.summary?.ecoFriendlyPercentage || 0,
+            sustainabilityScore: report.data?.summary?.sustainabilityScore || 0,
+            totalBudget: report.data?.summary?.totalBudget || 0,
+            avgBudget: report.data?.summary?.avgBudget || 0
           },
-          charts: ReportController.getRelevantCharts(report, ['Destination Popularity', 'Seasonal Trends'])
+          charts: ReportController.getRelevantCharts(report, ['Destination Popularity', 'Seasonal Trends', 'Return Visit Patterns'])
         };
 
       default:
-        // For unknown types, return essential data only
+        // For unknown types, return essential data with all available summary fields
         return {
           ...baseInfo,
           summary: report.data?.summary || {},
-          charts: report.data?.charts?.slice(0, 3) || [] // Limit to 3 charts
+          charts: report.data?.charts?.slice(0, 3) || [], // Limit to 3 charts
+          details: report.data?.details || {}
         };
     }
   }
@@ -753,6 +780,28 @@ class ReportController {
                 font-size: 12px;
                 color: #666;
             }
+            .filter-item {
+                margin-bottom: 8px;
+                padding: 5px 0;
+            }
+            .filter-label {
+                font-weight: bold;
+                color: #333;
+                margin-right: 10px;
+            }
+            .tag-list {
+                display: inline-flex;
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            .tag {
+                background: #007bff;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 10px;
+                font-weight: bold;
+            }
         </style>
     </head>
     <body>
@@ -767,7 +816,37 @@ class ReportController {
                 minute: '2-digit'
             })}</div>
             <div class="meta-info">Status: ${report.status.toUpperCase()}</div>
+            ${report.isScheduled ? `<div class="meta-info">Scheduled: ${report.scheduleFrequency ? report.scheduleFrequency.toUpperCase() : 'YES'}</div>` : ''}
+            ${report.lastGenerated ? `<div class="meta-info">Last Generated: ${new Date(report.lastGenerated).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric'
+            })}</div>` : ''}
+            ${report.tags && report.tags.length > 0 ? `<div class="meta-info">Tags: ${report.tags.join(', ')}</div>` : ''}
         </div>
+
+        ${report.filters && Object.keys(report.filters).length > 0 ? `
+        <div class="section">
+            <div class="section-title">Report Filters</div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                ${report.filters.dateRange ? `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Date Range:</strong> 
+                        ${report.filters.dateRange.startDate ? new Date(report.filters.dateRange.startDate).toLocaleDateString() : 'Not specified'} - 
+                        ${report.filters.dateRange.endDate ? new Date(report.filters.dateRange.endDate).toLocaleDateString() : 'Not specified'}
+                    </div>
+                ` : ''}
+                ${report.filters.tripType ? `<div style="margin-bottom: 10px;"><strong>Trip Type:</strong> ${report.filters.tripType}</div>` : ''}
+                ${report.filters.destination ? `<div style="margin-bottom: 10px;"><strong>Destination:</strong> ${report.filters.destination}</div>` : ''}
+                ${report.filters.budgetRange ? `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Budget Range:</strong> 
+                        $${report.filters.budgetRange.min || 0} - $${report.filters.budgetRange.max || 'No limit'}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+        ` : ''}
     `;
 
     // Summary section - handle both old structure (report.data.summary) and new structure (report.summary)
@@ -865,6 +944,15 @@ class ReportController {
         <div class="footer">
             <p>Generated by PackLightly Analytics System</p>
             <p>Report ID: ${report._id}</p>
+            ${report.isScheduled ? `<p>Scheduled Report - Frequency: ${report.scheduleFrequency || 'Custom'}</p>` : ''}
+            <p>Generated on: ${new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZoneName: 'short'
+            })}</p>
         </div>
     </body>
     </html>
