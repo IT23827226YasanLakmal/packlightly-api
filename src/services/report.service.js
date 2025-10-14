@@ -145,6 +145,11 @@ class ReportService {
     return Report.findOneAndDelete({ _id: id, ownerUid });
   }
 
+  // Update report title
+  static async updateReportTitle(id, title) {
+    return Report.findByIdAndUpdate(id, { title }, { new: true });
+  }
+
   // Generate Trip Analytics Report
   static async generateTripAnalytics(ownerUid, filters = {}) {
     const query = { ownerUid };
@@ -175,6 +180,62 @@ class ReportService {
       query.budget = {};
       if (filters.budgetRange.min) query.budget.$gte = filters.budgetRange.min;
       if (filters.budgetRange.max) query.budget.$lte = filters.budgetRange.max;
+    }
+
+    // Apply geographic regions filter
+    if (filters.geographicRegions && filters.geographicRegions.length > 0) {
+      const regionQueries = filters.geographicRegions.map(region => 
+        new RegExp(region, 'i')
+      );
+      query.destination = { $in: regionQueries };
+    }
+
+    // Apply sustainability levels filter
+    if (filters.sustainabilityLevels && filters.sustainabilityLevels.length > 0) {
+      const sustainabilityQuery = [];
+      filters.sustainabilityLevels.forEach(level => {
+        switch(level.toLowerCase()) {
+          case 'high':
+            sustainabilityQuery.push({ ecoScore: { $gte: 80 } });
+            break;
+          case 'medium':
+            sustainabilityQuery.push({ ecoScore: { $gte: 50, $lt: 80 } });
+            break;
+          case 'low':
+            sustainabilityQuery.push({ ecoScore: { $lt: 50 } });
+            break;
+          case 'eco-friendly':
+            sustainabilityQuery.push({ isEcoFriendly: true });
+            break;
+        }
+      });
+      if (sustainabilityQuery.length > 0) {
+        query.$or = sustainabilityQuery;
+      }
+    }
+
+    // Apply budget ranges filter (advanced)
+    if (filters.budgetRanges && filters.budgetRanges.length > 0) {
+      const budgetQuery = [];
+      filters.budgetRanges.forEach(range => {
+        switch(range) {
+          case 'budget':
+            budgetQuery.push({ budget: { $lt: 1000 } });
+            break;
+          case 'mid-range':
+            budgetQuery.push({ budget: { $gte: 1000, $lt: 5000 } });
+            break;
+          case 'luxury':
+            budgetQuery.push({ budget: { $gte: 5000 } });
+            break;
+          case 'backpacker':
+            budgetQuery.push({ budget: { $lt: 500 } });
+            break;
+        }
+      });
+      if (budgetQuery.length > 0) {
+        query.$or = query.$or ? { $and: [{ $or: query.$or }, { $or: budgetQuery }] } : budgetQuery;
+      }
     }
 
     const trips = await Trip.find(query).sort({ startDate: -1 });
@@ -412,7 +473,18 @@ class ReportService {
   static async generatePackingStatistics(ownerUid, filters = {}) {
     const query = { ownerUid };
 
-    const packingLists = await PackingList.find(query).populate('tripId');
+    let packingLists = await PackingList.find(query).populate('tripId');
+
+    // Apply categories filter if provided
+    if (filters.categories && filters.categories.length > 0) {
+      packingLists = packingLists.filter(list => {
+        return list.categories.some(category => 
+          filters.categories.some(filterCat => 
+            category.name.toLowerCase().includes(filterCat.toLowerCase())
+          )
+        );
+      });
+    }
 
     const totalLists = packingLists.length;
     let totalItems = 0;
@@ -1038,6 +1110,41 @@ class ReportService {
       query.category = new RegExp(filters.category, 'i');
     }
 
+    // Apply categories filter (multiple categories)
+    if (filters.categories && filters.categories.length > 0) {
+      const categoryQueries = filters.categories.map(cat => 
+        new RegExp(cat, 'i')
+      );
+      query.category = { $in: categoryQueries };
+    }
+
+    // Apply sustainability levels filter
+    if (filters.sustainabilityLevels && filters.sustainabilityLevels.length > 0) {
+      const sustainabilityQuery = [];
+      filters.sustainabilityLevels.forEach(level => {
+        switch(level.toLowerCase()) {
+          case 'high':
+            sustainabilityQuery.push({ eco: { $gte: 4 } });
+            break;
+          case 'medium':
+            sustainabilityQuery.push({ eco: { $gte: 3, $lt: 4 } });
+            break;
+          case 'low':
+            sustainabilityQuery.push({ eco: { $lt: 3 } });
+            break;
+          case 'certified':
+            sustainabilityQuery.push({ isCertified: true });
+            break;
+          case 'organic':
+            sustainabilityQuery.push({ isOrganic: true });
+            break;
+        }
+      });
+      if (sustainabilityQuery.length > 0) {
+        query.$or = sustainabilityQuery;
+      }
+    }
+
     const products = await Product.find(query);
 
     // Calculate summary statistics
@@ -1282,8 +1389,52 @@ class ReportService {
       includeOptionalFields = true, 
       specificFields = null,
       lightweight = false,
+      userSegments = [],
+      geographicRegions = [],
+      sustainabilityLevels = [],
+      budgetRanges = [],
+      categories = [],
       ...reportFilters 
     } = filters;
+
+    // Process specific fields if provided as comma-separated string
+    let processedSpecificFields = specificFields;
+    if (typeof specificFields === 'string' && specificFields.trim()) {
+      processedSpecificFields = specificFields
+        .split(',')
+        .map(field => field.trim())
+        .filter(field => field.length > 0);
+    }
+
+    // Process categories if provided as comma-separated string
+    let processedCategories = categories;
+    if (typeof categories === 'string' && categories.trim()) {
+      processedCategories = categories
+        .split(',')
+        .map(cat => cat.trim())
+        .filter(cat => cat.length > 0);
+    }
+
+    // Add advanced filters to reportFilters if they have values
+    if (userSegments && userSegments.length > 0) {
+      reportFilters.userSegments = userSegments;
+    }
+    
+    if (geographicRegions && geographicRegions.length > 0) {
+      reportFilters.geographicRegions = geographicRegions;
+    }
+    
+    if (sustainabilityLevels && sustainabilityLevels.length > 0) {
+      reportFilters.sustainabilityLevels = sustainabilityLevels;
+    }
+    
+    if (budgetRanges && budgetRanges.length > 0) {
+      reportFilters.budgetRanges = budgetRanges;
+    }
+    
+    if (processedCategories && processedCategories.length > 0) {
+      reportFilters.categories = processedCategories;
+    }
 
     // Generate the base report
     let report;
@@ -1319,7 +1470,7 @@ class ReportService {
 
     // Apply customization based on filters
     const includeOptionals = lightweight ? false : includeOptionalFields;
-    const customizedReport = this.customizeReport(report, type, includeOptionals, specificFields);
+    const customizedReport = this.customizeReport(report, type, includeOptionals, processedSpecificFields);
 
     return customizedReport;
   }

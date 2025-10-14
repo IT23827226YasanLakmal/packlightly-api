@@ -1,5 +1,4 @@
 const ReportService = require('../services/report.service');
-const EnhancedReportService = require('../services/enhancedReport.service');
 const ReportFormatHelpers = require('../utils/reportFormatHelpers');
 
 class ReportController {
@@ -109,8 +108,8 @@ class ReportController {
         
         // If a custom title was provided, update it
         if (title && title.trim()) {
-          report.title = title.trim();
-          await report.save();
+          // Find and update the report in the database
+          await ReportService.updateReportTitle(report._id, title.trim());
         }
         
         console.log(`Report generated successfully: ${report._id}`);
@@ -163,8 +162,8 @@ class ReportController {
       
       // Update title if provided
       if (title && title.trim()) {
-        report.title = title.trim();
-        await report.save();
+        await ReportService.updateReportTitle(report._id, title.trim());
+        report.title = title.trim(); // Update the returned object as well
       }
       
       res.status(201).json({
@@ -715,12 +714,7 @@ class ReportController {
       }
 
       // Validate report type
-      const validTypes = [
-        'trip_analytics', 'packing_statistics', 'user_activity',
-        'eco_impact', 'budget_analysis', 'destination_trends',
-        'eco_inventory', 'news_section'
-      ];
-      
+      const validTypes = ReportService.getReportTypes().map(t => t.value);
       if (!validTypes.includes(type)) {
         return res.status(400).json({
           success: false,
@@ -747,50 +741,25 @@ class ReportController {
 
       let reportData;
 
-      // Generate report based on type using enhanced service
-      switch (type) {
-        case 'trip_analytics':
-          reportData = await EnhancedReportService.generateTripAnalyticsReport(req.user.uid, filters);
-          break;
-        case 'packing_statistics':
-          reportData = await EnhancedReportService.generatePackingStatisticsReport(req.user.uid, filters);
-          break;
-        case 'user_activity':
-          reportData = await EnhancedReportService.generateUserActivityReport(req.user.uid, filters);
-          break;
-        case 'eco_impact':
-          reportData = await EnhancedReportService.generateEcoImpactReport(req.user.uid, filters);
-          break;
-        case 'budget_analysis':
-          reportData = await EnhancedReportService.generateBudgetAnalysisReport(req.user.uid, filters);
-          break;
-        case 'destination_trends':
-          reportData = await EnhancedReportService.generateDestinationTrendsReport(req.user.uid, filters);
-          break;
-        case 'eco_inventory':
-          reportData = await EnhancedReportService.generateEcoInventoryReport(req.user.uid, filters);
-          break;
-        case 'news_section':
-          reportData = await EnhancedReportService.generateNewsSectionReport(req.user.uid, filters);
-          break;
-        default:
-          return res.status(400).json({
-            success: false,
-            message: `Report type ${type} not yet implemented`
-          });
-      }
+      // Generate report using unified ReportService
+      reportData = await ReportService.generateReport(type, req.user.uid, filters);
 
-      // Override title if provided
+      // Update title if provided
       if (title && title.trim()) {
-        reportData.title = title.trim();
+        await ReportService.updateReportTitle(reportData._id, title.trim());
+        reportData.title = title.trim(); // Update the returned object as well
       }
 
-      // Set format
-      reportData.format = format;
+      // Set format if needed
+      if (format && format !== 'json') {
+        reportData.format = format;
+        // Update in database if format is specified
+        const Report = require('../models/Report');
+        await Report.findByIdAndUpdate(reportData._id, { format });
+      }
 
-      // Save the report to database
-      const Report = require('../models/Report');
-      const savedReport = await new Report(reportData).save();
+      // The report is already saved by ReportService.generateReport()
+      const savedReport = reportData;
 
       // Validate the generated report
       const finalValidation = savedReport.validateReportData();
