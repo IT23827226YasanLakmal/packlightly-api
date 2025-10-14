@@ -172,18 +172,6 @@ ReportSchema.index({ status: 1 });
 ReportSchema.index({ ownerUid: 1, status: 1 });
 ReportSchema.index({ tags: 1 });
 
-// Static methods for report types
-ReportSchema.statics.getReportTypes = function() {
-  return [
-    { value: 'trip_analytics', label: 'Trip Analytics', description: 'Analyze your trip patterns and trends' },
-    { value: 'packing_statistics', label: 'Packing Statistics', description: 'Statistics on your packing lists and items' },
-    { value: 'user_activity', label: 'User Activity', description: 'Your activity and engagement metrics' },
-    { value: 'eco_impact', label: 'Eco Impact', description: 'Environmental impact of your travel choices' },
-    { value: 'budget_analysis', label: 'Budget Analysis', description: 'Analysis of your travel spending patterns' },
-    { value: 'destination_trends', label: 'Destination Trends', description: 'Popular destinations and travel trends' }
-  ];
-};
-
 // Instance method to check if report needs regeneration
 ReportSchema.methods.needsRegeneration = function() {
   if (!this.isScheduled) return false;

@@ -1,4 +1,6 @@
 const ReportService = require('../services/report.service');
+const EnhancedReportService = require('../services/enhancedReport.service');
+const ReportFormatHelpers = require('../utils/reportFormatHelpers');
 
 class ReportController {
   // GET /api/reports - List all reports for the authenticated user
@@ -697,6 +699,272 @@ class ReportController {
     `;
 
     return html;
+  }
+
+  // POST /api/reports/enhanced - Generate enhanced standardized reports
+  static async generateEnhanced(req, res, next) {
+    try {
+      const { type, filters = {}, format = 'json', title } = req.body;
+      
+      // Validate required fields
+      if (!type) {
+        return res.status(400).json({
+          success: false,
+          message: 'Report type is required'
+        });
+      }
+
+      // Validate report type
+      const validTypes = [
+        'trip_analytics', 'packing_statistics', 'user_activity',
+        'eco_impact', 'budget_analysis', 'destination_trends',
+        'eco_inventory', 'news_section'
+      ];
+      
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid report type. Valid types are: ${validTypes.join(', ')}`
+        });
+      }
+
+      // Validate filters
+      const validation = ReportFormatHelpers.validateReportStructure({
+        ownerUid: req.user.uid,
+        title: title || 'Test Report',
+        type,
+        filters,
+        data: { summary: {}, charts: [], details: {} }
+      });
+
+      if (!validation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid report structure',
+          errors: validation.errors
+        });
+      }
+
+      let reportData;
+
+      // Generate report based on type using enhanced service
+      switch (type) {
+        case 'trip_analytics':
+          reportData = await EnhancedReportService.generateTripAnalyticsReport(req.user.uid, filters);
+          break;
+        case 'packing_statistics':
+          reportData = await EnhancedReportService.generatePackingStatisticsReport(req.user.uid, filters);
+          break;
+        case 'user_activity':
+          reportData = await EnhancedReportService.generateUserActivityReport(req.user.uid, filters);
+          break;
+        case 'eco_impact':
+          reportData = await EnhancedReportService.generateEcoImpactReport(req.user.uid, filters);
+          break;
+        case 'budget_analysis':
+          reportData = await EnhancedReportService.generateBudgetAnalysisReport(req.user.uid, filters);
+          break;
+        case 'destination_trends':
+          reportData = await EnhancedReportService.generateDestinationTrendsReport(req.user.uid, filters);
+          break;
+        case 'eco_inventory':
+          reportData = await EnhancedReportService.generateEcoInventoryReport(req.user.uid, filters);
+          break;
+        case 'news_section':
+          reportData = await EnhancedReportService.generateNewsSectionReport(req.user.uid, filters);
+          break;
+        default:
+          return res.status(400).json({
+            success: false,
+            message: `Report type ${type} not yet implemented`
+          });
+      }
+
+      // Override title if provided
+      if (title && title.trim()) {
+        reportData.title = title.trim();
+      }
+
+      // Set format
+      reportData.format = format;
+
+      // Save the report to database
+      const Report = require('../models/Report');
+      const savedReport = await new Report(reportData).save();
+
+      // Validate the generated report
+      const finalValidation = savedReport.validateReportData();
+      if (finalValidation.length > 0) {
+        console.warn('Report validation warnings:', finalValidation);
+      }
+
+      res.status(201).json({
+        success: true,
+        data: savedReport,
+        message: 'Enhanced report generated successfully',
+        format: savedReport.format,
+        validation: {
+          isValid: finalValidation.length === 0,
+          warnings: finalValidation
+        },
+        metadata: {
+          estimatedSize: savedReport.getEstimatedSize(),
+          generationTime: new Date() - savedReport.generatedAt + 'ms',
+          reportAge: savedReport.reportAge
+        }
+      });
+
+    } catch (error) {
+      console.error('Generate enhanced report error:', error);
+      
+      if (error.message.includes('Failed to generate')) {
+        return res.status(422).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      next(error);
+    }
+  }
+
+  // GET /api/reports/sample/:type - Generate sample data for testing report formats
+  static async getSampleReport(req, res, next) {
+    try {
+      const { type } = req.params;
+      
+      // Validate report type
+      const validTypes = [
+        'trip_analytics', 'packing_statistics', 'user_activity',
+        'eco_impact', 'budget_analysis', 'destination_trends',
+        'eco_inventory', 'news_section'
+      ];
+      
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid report type. Valid types are: ${validTypes.join(', ')}`
+        });
+      }
+
+      // Generate sample data
+      const sampleData = ReportFormatHelpers.generateSampleData(type);
+      const sampleFilters = ReportFormatHelpers.generateDateRange('month');
+      
+      const sampleReport = ReportFormatHelpers.createReportStructure(
+        'sample_user',
+        type,
+        sampleData,
+        { dateRange: sampleFilters },
+        { format: 'json', status: 'completed' }
+      );
+
+      // Validate the sample report
+      const validation = ReportFormatHelpers.validateReportStructure(sampleReport);
+
+      res.json({
+        success: true,
+        data: sampleReport,
+        message: `Sample ${type} report generated`,
+        validation,
+        metadata: {
+          isSample: true,
+          generatedAt: new Date().toISOString(),
+          reportType: type,
+          description: `This is a sample report showing the standardized format for ${type} reports`
+        }
+      });
+
+    } catch (error) {
+      console.error('Generate sample report error:', error);
+      next(error);
+    }
+  }
+
+  // GET /api/reports/formats - Get all available report formats and their specifications
+  static async getReportFormats(req, res, next) {
+    try {
+      const reportTypes = [
+        {
+          type: 'trip_analytics',
+          name: 'Trip Analytics',
+          description: 'Comprehensive analysis of travel patterns, destinations, and trip statistics',
+          summaryFields: [
+            'totalTrips', 'uniqueDestinations', 'favoriteDestination', 
+            'avgTripDuration', 'ecoFriendlyPercentage', 'returnVisits',
+            'estimatedCarbonFootprint', 'carbonSaved'
+          ],
+          chartTypes: ['bar', 'pie', 'line'],
+          sampleData: ReportFormatHelpers.generateSampleData('trip_analytics')
+        },
+        {
+          type: 'packing_statistics',
+          name: 'Packing Statistics',
+          description: 'Analysis of packing lists, item usage, and packing efficiency',
+          summaryFields: [
+            'totalPackingLists', 'completionRate', 'ecoFriendlyPercentage', 'aiUsagePercentage'
+          ],
+          chartTypes: ['pie', 'line', 'bar'],
+          sampleData: ReportFormatHelpers.generateSampleData('packing_statistics')
+        },
+        {
+          type: 'user_activity',
+          name: 'User Activity',
+          description: 'Overview of user engagement, posts, likes, and platform usage',
+          summaryFields: [
+            'totalPosts', 'totalLikes', 'avgLikesPerPost', 'ecoPostsShared'
+          ],
+          chartTypes: ['bar', 'pie', 'line'],
+          sampleData: ReportFormatHelpers.generateSampleData('user_activity')
+        },
+        {
+          type: 'eco_impact',
+          name: 'Eco Impact',
+          description: 'Environmental impact analysis and sustainability metrics',
+          summaryFields: [
+            'sustainabilityScore', 'carbonSaved', 'ecoFriendlyPercentage', 'estimatedCarbonFootprint'
+          ],
+          chartTypes: ['line', 'bar', 'pie'],
+          sampleData: ReportFormatHelpers.generateSampleData('eco_impact')
+        }
+        // Add other types as needed
+      ];
+
+      res.json({
+        success: true,
+        data: {
+          availableTypes: reportTypes,
+          commonStructure: {
+            base: {
+              ownerUid: 'string (required)',
+              title: 'string (required)',
+              type: 'enum (required)',
+              filters: 'object (optional)',
+              format: 'enum [json, pdf, csv]',
+              status: 'enum [pending, generating, completed, failed]'
+            },
+            data: {
+              summary: 'object (key metrics)',
+              charts: 'array (chart configurations)',
+              details: 'object (detailed breakdown)'
+            }
+          },
+          validationRules: {
+            chartStructure: {
+              type: 'required enum [bar, line, pie, doughnut]',
+              title: 'required string',
+              data: 'required array of numbers',
+              labels: 'required array of strings (same length as data)'
+            }
+          }
+        },
+        message: 'Report formats specification retrieved successfully'
+      });
+
+    } catch (error) {
+      console.error('Get report formats error:', error);
+      next(error);
+    }
   }
 }
 

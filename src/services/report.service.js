@@ -71,11 +71,42 @@ class ReportService {
 
     const trips = await Trip.find(query).sort({ startDate: -1 });
 
-    // Calculate summary statistics
+    // Calculate comprehensive summary statistics
     const totalTrips = trips.length;
     const totalBudget = trips.reduce((sum, trip) => sum + (trip.budget || 0), 0);
     const avgTripDuration = totalTrips > 0 ? 
       trips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / totalTrips : 0;
+
+    // Enhanced metrics for better analytics
+    const uniqueDestinations = [...new Set(trips.map(trip => trip.destination).filter(Boolean))].length;
+    const ecoTrips = trips.filter(trip => trip.isEcoFriendly || trip.ecoScore >= 70);
+    const ecoFriendlyPercentage = totalTrips > 0 ? Math.round((ecoTrips.length / totalTrips) * 100) : 0;
+    
+    // Calculate favorite destination
+    const destinationCounts = {};
+    trips.forEach(trip => {
+      if (trip.destination) {
+        destinationCounts[trip.destination] = (destinationCounts[trip.destination] || 0) + 1;
+      }
+    });
+    const favoriteDestination = Object.entries(destinationCounts)
+      .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None';
+
+    // Calculate return visits (destinations visited more than once)
+    const returnVisits = Object.values(destinationCounts).filter(count => count > 1).length;
+
+    // Calculate carbon footprint (simple estimation)
+    const estimatedCarbonFootprint = trips.reduce((sum, trip) => {
+      // Estimate based on trip type and duration
+      const baseCO2 = trip.type === 'International' ? 2000 : 500; // kg CO2
+      const durationMultiplier = (trip.durationDays || 1) / 7; // per week
+      return sum + (baseCO2 * durationMultiplier);
+    }, 0);
+
+    // Calculate carbon saved through eco choices
+    const carbonSaved = ecoTrips.reduce((sum, trip) => {
+      return sum + ((trip.carbonSaved || 0) + (trip.ecoScore || 0) * 2); // Estimate
+    }, 0);
 
     // Trip type distribution
     const tripTypeData = {};
@@ -91,12 +122,14 @@ class ReportService {
       }
     });
 
-    // Monthly trends
+    // Monthly trends (last 12 months)
     const monthlyData = {};
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     trips.forEach(trip => {
       if (trip.startDate) {
-        const month = trip.startDate.toISOString().slice(0, 7); // YYYY-MM
-        monthlyData[month] = (monthlyData[month] || 0) + 1;
+        const date = new Date(trip.startDate);
+        const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
       }
     });
 
@@ -118,19 +151,107 @@ class ReportService {
       else budgetRanges['5000+']++;
     });
 
+    // Enhanced top destinations with metrics
+    const topDestinations = Object.entries(destinationCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([destination, count]) => {
+        const destTrips = trips.filter(trip => trip.destination === destination);
+        const avgDuration = destTrips.length > 0 ? 
+          destTrips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / destTrips.length : 0;
+        const avgEcoScore = destTrips.length > 0 ?
+          destTrips.reduce((sum, trip) => sum + (trip.ecoScore || 0), 0) / destTrips.length : 0;
+        
+        return {
+          name: destination,
+          trips: count,
+          avgDuration: Math.round(avgDuration * 10) / 10,
+          ecoScore: Math.round(avgEcoScore)
+        };
+      });
+
+    // Monthly breakdown with enhanced metrics
+    const monthlyBreakdown = Object.entries(monthlyData)
+      .map(([month, tripCount]) => {
+        const monthTrips = trips.filter(trip => {
+          if (!trip.startDate) return false;
+          const date = new Date(trip.startDate);
+          const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+          return monthKey === month;
+        });
+        
+        const avgDuration = monthTrips.length > 0 ?
+          monthTrips.reduce((sum, trip) => sum + (trip.durationDays || 0), 0) / monthTrips.length : 0;
+        const carbonFootprint = monthTrips.reduce((sum, trip) => sum + (trip.carbonFootprint || 0), 0);
+        
+        return {
+          month,
+          trips: tripCount,
+          avgDuration: Math.round(avgDuration * 10) / 10,
+          carbonFootprint: Math.round(carbonFootprint)
+        };
+      })
+      .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
+    // Enhanced eco impact breakdown
+    const ecoImpactBreakdown = {
+      transportationSavings: trips.reduce((sum, trip) => sum + (trip.transportationSavings || 0), 0),
+      accommodationSavings: trips.reduce((sum, trip) => sum + (trip.accommodationSavings || 0), 0),
+      activitySavings: trips.reduce((sum, trip) => sum + (trip.activitySavings || 0), 0),
+      totalCarbonSaved: carbonSaved,
+      avgEcoScore: ecoTrips.length > 0 ? 
+        Math.round(ecoTrips.reduce((sum, trip) => sum + (trip.ecoScore || 0), 0) / ecoTrips.length) : 0
+    };
+
+    // Smart recommendations based on data
+    const recommendations = [];
+    const avgEcoScore = ecoTrips.length > 0 ? 
+      ecoTrips.reduce((sum, trip) => sum + (trip.ecoScore || 0), 0) / ecoTrips.length : 0;
+    
+    if (avgEcoScore < 70) {
+      recommendations.push("Consider eco-friendly accommodation options to improve your sustainability score");
+    }
+    if (ecoFriendlyPercentage > 70) {
+      recommendations.push(`Your ${favoriteDestination} trips show excellent eco-performance - continue this pattern`);
+    }
+    if (totalTrips > 5) {
+      recommendations.push("You're an active traveler! Consider offsetting your carbon footprint");
+    }
+    if (returnVisits > 0) {
+      recommendations.push("You have favorite destinations! Share your local insights with other travelers");
+    }
+    if (recommendations.length === 0) {
+      recommendations.push("Keep exploring and sharing your travel experiences!");
+    }
+
     const reportData = {
       ownerUid,
-      title: 'Trip Analytics Report',
+      title: 'Trip Analytics Report - Enhanced',
       type: 'trip_analytics',
       filters,
       data: {
         summary: {
           totalTrips,
-          totalBudget,
+          uniqueDestinations,
+          favoriteDestination,
           avgTripDuration: Math.round(avgTripDuration * 100) / 100,
-          avgBudget: totalTrips > 0 ? Math.round(totalBudget / totalTrips) : 0
+          avgStayDuration: Math.round(avgTripDuration * 100) / 100, // Same as avgTripDuration
+          ecoFriendlyPercentage,
+          returnVisits,
+          estimatedCarbonFootprint: Math.round(estimatedCarbonFootprint),
+          carbonSaved: Math.round(carbonSaved),
+          totalBudget: Math.round(totalBudget),
+          avgBudget: totalTrips > 0 ? Math.round(totalBudget / totalTrips) : 0,
+          maxBudget: totalTrips > 0 ? Math.max(...trips.map(t => t.budget || 0)) : 0,
+          minBudget: totalTrips > 0 ? Math.min(...trips.map(t => t.budget || 0)) : 0
         },
         charts: [
+          {
+            type: 'bar',
+            title: 'Trips Per Month',
+            data: Object.values(monthlyData),
+            labels: Object.keys(monthlyData)
+          },
           {
             type: 'pie',
             title: 'Trip Types Distribution',
@@ -138,16 +259,10 @@ class ReportService {
             labels: Object.keys(tripTypeData)
           },
           {
-            type: 'bar',
-            title: 'Top Destinations',
-            data: Object.values(destinationData).slice(0, 10),
-            labels: Object.keys(destinationData).slice(0, 10)
-          },
-          {
             type: 'line',
-            title: 'Monthly Trip Trends',
-            data: Object.values(monthlyData),
-            labels: Object.keys(monthlyData)
+            title: 'Eco Score Improvement',
+            data: ecoTrips.map(trip => trip.ecoScore || 0),
+            labels: ecoTrips.map((trip, index) => `Trip ${index + 1}`)
           },
           {
             type: 'doughnut',
@@ -157,8 +272,27 @@ class ReportService {
           }
         ],
         details: {
-          trips: trips.slice(0, 10), // Latest 10 trips
-          totalPages: Math.ceil(totalTrips / 10)
+          topDestinations,
+          monthlyBreakdown,
+          ecoImpactBreakdown,
+          recommendations,
+          recentTrips: trips.slice(0, 10).map(trip => ({
+            destination: trip.destination,
+            startDate: trip.startDate,
+            duration: trip.durationDays,
+            budget: trip.budget,
+            ecoScore: trip.ecoScore,
+            type: trip.type
+          })),
+          travelPatterns: {
+            mostActiveMonth: Object.entries(monthlyData).sort(([,a], [,b]) => b - a)[0]?.[0] || 'None',
+            avgTripsPerMonth: Object.keys(monthlyData).length > 0 ? 
+              Math.round(totalTrips / Object.keys(monthlyData).length * 10) / 10 : 0,
+            longestTrip: trips.reduce((longest, trip) => 
+              (trip.durationDays || 0) > (longest.durationDays || 0) ? trip : longest, {}),
+            shortestTrip: trips.reduce((shortest, trip) => 
+              (trip.durationDays || 999) < (shortest.durationDays || 999) ? trip : shortest, {})
+          }
         }
       }
     };
@@ -180,19 +314,40 @@ class ReportService {
 
     const categoryStats = {};
     const itemFrequency = {};
+    const completionRateOverTime = {};
 
     packingLists.forEach(list => {
+      // Track completion rate over time
+      if (list.createdAt) {
+        const month = list.createdAt.toISOString().slice(0, 7);
+        if (!completionRateOverTime[month]) {
+          completionRateOverTime[month] = { total: 0, completed: 0 };
+        }
+      }
+
+      let listTotal = 0;
+      let listCompleted = 0;
+
       list.categories.forEach(category => {
         if (!categoryStats[category.name]) {
-          categoryStats[category.name] = { total: 0, checked: 0, eco: 0 };
+          categoryStats[category.name] = { 
+            total: 0, 
+            checked: 0, 
+            eco: 0, 
+            avgPerList: 0,
+            ecoPercentage: 0,
+            completionRate: 0
+          };
         }
 
         category.items.forEach(item => {
           totalItems++;
+          listTotal++;
           categoryStats[category.name].total++;
           
           if (item.checked) {
             checkedItems++;
+            listCompleted++;
             categoryStats[category.name].checked++;
           }
           
@@ -210,22 +365,109 @@ class ReportService {
           itemFrequency[itemName] = (itemFrequency[itemName] || 0) + 1;
         });
       });
+
+      // Update monthly completion rate
+      if (list.createdAt) {
+        const month = list.createdAt.toISOString().slice(0, 7);
+        if (completionRateOverTime[month]) {
+          completionRateOverTime[month].total += listTotal;
+          completionRateOverTime[month].completed += listCompleted;
+        }
+      }
     });
 
-    // Calculate percentages
+    // Calculate enhanced metrics
     const completionRate = totalItems > 0 ? (checkedItems / totalItems) * 100 : 0;
     const ecoPercentage = totalItems > 0 ? (ecoItems / totalItems) * 100 : 0;
     const aiUsagePercentage = totalItems > 0 ? (aiGeneratedItems / totalItems) * 100 : 0;
+    const avgItemsPerList = totalLists > 0 ? totalItems / totalLists : 0;
 
-    // Most common items
+    // Calculate category-specific metrics
+    Object.keys(categoryStats).forEach(category => {
+      const stats = categoryStats[category];
+      stats.avgPerList = totalLists > 0 ? stats.total / totalLists : 0;
+      stats.ecoPercentage = stats.total > 0 ? (stats.eco / stats.total) * 100 : 0;
+      stats.completionRate = stats.total > 0 ? (stats.checked / stats.total) * 100 : 0;
+    });
+
+    // Most common items with enhanced data
     const commonItems = Object.entries(itemFrequency)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 20)
-      .map(([name, count]) => ({ name, count }));
+      .map(([name, count]) => ({ 
+        name, 
+        count, 
+        frequency: Math.round((count / totalLists) * 100) // Percentage of lists containing this item
+      }));
+
+    // Enhanced category breakdown
+    const categoryBreakdown = Object.entries(categoryStats).map(([category, stats]) => ({
+      category,
+      totalItems: stats.total,
+      ecoItems: stats.eco,
+      avgPerList: Math.round(stats.avgPerList * 10) / 10,
+      ecoPercentage: Math.round(stats.ecoPercentage),
+      completionRate: Math.round(stats.completionRate)
+    })).sort((a, b) => b.totalItems - a.totalItems);
+
+    // Top eco-friendly items
+    const topEcoItems = [];
+    packingLists.forEach(list => {
+      list.categories.forEach(category => {
+        category.items.forEach(item => {
+          if (item.eco) {
+            const existing = topEcoItems.find(i => i.name.toLowerCase() === item.name.toLowerCase());
+            if (existing) {
+              existing.count++;
+            } else {
+              topEcoItems.push({ name: item.name, count: 1, category: category.name });
+            }
+          }
+        });
+      });
+    });
+    topEcoItems.sort((a, b) => b.count - a.count).splice(10); // Top 10
+
+    // Packing efficiency metrics
+    const packingEfficiency = {
+      avgCompletionRate: Math.round(completionRate),
+      bestCategory: categoryBreakdown.length > 0 ? 
+        categoryBreakdown.reduce((best, cat) => cat.completionRate > best.completionRate ? cat : best).category : 'None',
+      worstCategory: categoryBreakdown.length > 0 ?
+        categoryBreakdown.reduce((worst, cat) => cat.completionRate < worst.completionRate ? cat : worst).category : 'None',
+      ecoLeader: categoryBreakdown.length > 0 ?
+        categoryBreakdown.reduce((leader, cat) => cat.ecoPercentage > leader.ecoPercentage ? cat : leader).category : 'None',
+      mostItemsCategory: categoryBreakdown.length > 0 ? categoryBreakdown[0].category : 'None'
+    };
+
+    // Smart recommendations
+    const recommendations = [];
+    if (completionRate < 70) {
+      recommendations.push("Consider reviewing your packing lists more carefully - your completion rate could be improved");
+    }
+    if (ecoPercentage > 50) {
+      recommendations.push("Great job on eco-friendly packing! You're making sustainable choices");
+    } else {
+      recommendations.push("Try adding more eco-friendly alternatives to your packing lists");
+    }
+    if (aiUsagePercentage > 30) {
+      recommendations.push("You're making good use of AI suggestions! Keep leveraging smart packing tips");
+    }
+    if (avgItemsPerList > 25) {
+      recommendations.push("Your lists are quite comprehensive - consider if all items are necessary for each trip");
+    }
+
+    // Completion rate timeline
+    const completionTimeline = Object.entries(completionRateOverTime)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, data]) => ({
+        month,
+        completionRate: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0
+      }));
 
     const reportData = {
       ownerUid,
-      title: 'Packing Statistics Report',
+      title: 'Packing Statistics Report - Enhanced',
       type: 'packing_statistics',
       filters,
       data: {
@@ -234,34 +476,61 @@ class ReportService {
           totalItems,
           completionRate: Math.round(completionRate),
           ecoFriendlyPercentage: Math.round(ecoPercentage),
-          aiUsagePercentage: Math.round(aiUsagePercentage)
+          aiUsagePercentage: Math.round(aiUsagePercentage),
+          avgItemsPerList: Math.round(avgItemsPerList * 10) / 10,
+          mostCommonItem: commonItems[0]?.name || 'None',
+          bestCategory: packingEfficiency.bestCategory,
+          ecoItemsCount: ecoItems,
+          aiSuggestedCount: aiGeneratedItems
         },
         charts: [
           {
-            type: 'bar',
-            title: 'Items by Category',
+            type: 'pie',
+            title: 'Item Categories Distribution',
             data: Object.values(categoryStats).map(stat => stat.total),
             labels: Object.keys(categoryStats)
           },
           {
-            type: 'doughnut',
-            title: 'Completion Rate by Category',
-            data: Object.values(categoryStats).map(stat => 
-              stat.total > 0 ? Math.round((stat.checked / stat.total) * 100) : 0
-            ),
-            labels: Object.keys(categoryStats)
+            type: 'line',
+            title: 'Completion Rate Over Time',
+            data: completionTimeline.map(entry => entry.completionRate),
+            labels: completionTimeline.map(entry => entry.month)
           },
           {
             type: 'bar',
-            title: 'Most Common Items',
-            data: commonItems.slice(0, 10).map(item => item.count),
-            labels: commonItems.slice(0, 10).map(item => item.name)
+            title: 'Eco vs Standard Items by Category',
+            data: Object.values(categoryStats).map(stat => stat.eco),
+            labels: Object.keys(categoryStats)
+          },
+          {
+            type: 'doughnut',
+            title: 'Item Sources',
+            data: [aiGeneratedItems, totalItems - aiGeneratedItems],
+            labels: ['AI Suggested', 'User Added']
           }
         ],
         details: {
-          categoryStats,
-          commonItems: commonItems.slice(0, 50),
-          recentLists: packingLists.slice(0, 10)
+          categoryBreakdown,
+          topItems: commonItems.slice(0, 15),
+          topEcoItems: topEcoItems.slice(0, 10),
+          packingEfficiency,
+          recommendations,
+          completionTimeline,
+          recentLists: packingLists.slice(0, 10).map(list => ({
+            id: list._id,
+            tripDestination: list.tripId?.destination || 'Unknown',
+            itemCount: list.categories.reduce((sum, cat) => sum + cat.items.length, 0),
+            completedItems: list.categories.reduce((sum, cat) => 
+              sum + cat.items.filter(item => item.checked).length, 0),
+            ecoItems: list.categories.reduce((sum, cat) => 
+              sum + cat.items.filter(item => item.eco).length, 0),
+            createdAt: list.createdAt
+          })),
+          itemInsights: {
+            neverPackedItems: commonItems.filter(item => item.count === 1).length,
+            alwaysPackedItems: commonItems.filter(item => item.frequency >= 80).length,
+            forgottenItemsRate: Math.round((totalItems - checkedItems) / totalItems * 100) || 0
+          }
         }
       }
     };

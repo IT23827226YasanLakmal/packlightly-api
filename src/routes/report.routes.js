@@ -6,11 +6,17 @@ const { verifyFirebaseToken } = require('../middlewares/auth.middleware');
 // GET /api/reports/types - Get available report types (PUBLIC)
 router.get('/types', ReportController.getTypes);
 
+// GET /api/reports/formats - Get report formats specification (PUBLIC)
+router.get('/formats', ReportController.getReportFormats);
+
 // All other report routes require authentication
 router.use(verifyFirebaseToken);
 
 // GET /api/reports/overview - Get quick overview stats
 router.get('/overview', ReportController.getOverview);
+
+// GET /api/reports/sample/:type - Generate sample report data for testing
+router.get('/sample/:type', ReportController.getSampleReport);
 
 // GET /api/reports - List all reports for the authenticated user
 router.get('/', ReportController.list);
@@ -20,6 +26,9 @@ router.post('/generate', ReportController.generate);
 
 // POST /api/reports/generate-sync - Generate a new report (sync)
 router.post('/generate-sync', ReportController.generateSync);
+
+// POST /api/reports/enhanced - Generate enhanced standardized reports
+router.post('/enhanced', ReportController.generateEnhanced);
 
 // GET /api/reports/:id - Get a specific report
 router.get('/:id', ReportController.get);
