@@ -16,10 +16,22 @@ async function updateCategory (req, res) {
     const { id, category } = req.params;
     const { items } = req.body;
     
-    // Validate category
-    const validCategories = ['Clothing', 'Toiletries', 'Electronics', 'Documents', 'Miscellaneous'];
+    // Validate category - expanded list to support AI-generated categories
+    const validCategories = [
+      'Clothing', 
+      'Toiletries', 
+      'Electronics', 
+      'Documents', 
+      'Miscellaneous',
+      'Health & Safety',
+      'Weather Protection',
+      'Travel Infrastructure',
+      'Essentials',
+      'Business Essentials',
+      'Local Infrastructure'
+    ];
     if (!validCategories.includes(category)) {
-      return res.status(400).json({ error: 'Invalid category' });
+      return res.status(400).json({ error: `Invalid category. Valid categories are: ${validCategories.join(', ')}` });
     }
     
     const packingList = await svc.updateCategoryItems(
